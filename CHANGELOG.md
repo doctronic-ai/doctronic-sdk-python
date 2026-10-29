@@ -14,9 +14,10 @@ Built from the same contract as 0.1.0 (`info.version` 0.1.0, 22 operations).
     anything else as unknown. This applies to every enum in `doctronic.types`, including
     `Scope`, `Role`, `Sex`, and `State`.
   - Data that doesn't match the contract, such as a missing field or a value of another type, is
-    returned instead of raised. Fields that match are typed as usual, the others are kept as the
-    API sent them, and missing ones are `None`. The SDK logs a warning on the `doctronic` logger
-    that names the request ID and the fields, never their values.
+    returned instead of raised. Fields that match are typed as usual, and the others are kept as
+    the API sent them. Missing required fields are `None`; optional fields keep their defaults.
+    The SDK logs a warning on the `doctronic` logger that names the request ID and the fields,
+    never their values.
   - `APIResponseValidationError` now means the SDK can't use the response at all: the body isn't
     JSON, `data` is missing or `null` for an operation that returns data, or a `200` stream isn't
     `text/event-stream`.

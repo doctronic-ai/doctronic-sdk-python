@@ -169,9 +169,9 @@ Responses from a newer API don't fail, so you can ignore what you don't know yet
   `AppointmentStatus` that equals the string, such as `"on_hold"`; the known values are the usual
   members. Compare with the members you handle and treat anything else as unknown.
 - Data that doesn't match the contract, such as a missing field or a value of another type, is
-  returned rather than raised: fields that match are typed, the rest are kept as sent, and
-  missing ones are `None`. The SDK logs a warning on the `doctronic` logger with the request ID
-  and the field names, never their values.
+  returned rather than raised: fields that match are typed, and the rest are kept as sent.
+  Missing required fields are `None`; optional fields keep their defaults. The SDK logs a warning
+  on the `doctronic` logger with the request ID and the field names, never their values.
 
 | Short name | Contract model |
 | --- | --- |
