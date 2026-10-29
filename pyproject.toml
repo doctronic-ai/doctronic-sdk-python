@@ -39,8 +39,9 @@ dev = [
 ]
 
 [tool.uv]
-# Resolve only releases at least two weeks old. Move the date forward to take newer releases.
-exclude-newer = "2026-10-10T00:00:00Z"
+# Resolve only releases at least two weeks old. uv works out the cutoff each time it locks, so
+# `uv lock --upgrade` and Dependabot (cooldown in .github/dependabot.yml) follow the same rule.
+exclude-newer = "14 days"
 
 [build-system]
 requires = ["hatchling==1.32.4"]
