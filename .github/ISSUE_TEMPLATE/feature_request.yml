@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest a change or addition to the SDK.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never post API tokens, webhook secrets, patient data, or PHI here.** Issues are public. Use made-up values in examples.
+
+        The SDK covers the operations in the public API contract. To ask for a new API capability, start from the [Doctronic API documentation](https://docs.doctronic.ai).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: The task, and what makes it hard with the SDK today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like the SDK to do
+      description: An example of the code you'd like to write helps.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead
+  - type: checkboxes
+    id: no-secrets
+    attributes:
+      label: Before you submit
+      options:
+        - label: This issue contains no API tokens, webhook secrets, patient data, or PHI.
+          required: true

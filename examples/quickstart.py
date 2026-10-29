@@ -5,20 +5,18 @@ backend or a terminal, never a browser:
 
     export DOCTRONIC_API_TOKEN="replace-with-your-staging-token"
     python examples/quickstart.py
-
-Set DOCTRONIC_API_URL to send the requests somewhere other than staging.
 """
 
 from __future__ import annotations
 
-import os
 import uuid
 
 from doctronic import Doctronic
 from doctronic.types import MessageContentEvent, MessageStartEvent, MessageStopEvent
 
-# Reads DOCTRONIC_API_TOKEN, and DOCTRONIC_ENVIRONMENT (default: staging).
-client = Doctronic(base_url=os.environ.get("DOCTRONIC_API_URL"))
+# Reads DOCTRONIC_API_TOKEN, and DOCTRONIC_ENVIRONMENT (default: staging). Pass base_url= to send
+# the requests somewhere else.
+client = Doctronic()
 
 # 1. Create a user. The SDK sends an Idempotency-Key and reuses it if it retries.
 user = client.users.create(

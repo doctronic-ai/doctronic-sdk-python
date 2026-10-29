@@ -50,11 +50,18 @@ Built from the same contract as 0.1.0 (`info.version` 0.1.0, 22 operations).
   labeled `breaking-change` when the docs flag one.
 - `contract-drift.yml`: a daily job that reports when the pinned contract falls behind the
   published one. It isn't a required check.
+- README sections on versioning and support, and a link to the TypeScript SDK.
+- `CONTRIBUTING.md`, a code of conduct (Contributor Covenant 2.1), issue and pull request
+  templates that warn against posting tokens or patient data, and `CODEOWNERS`.
 - Each release gets a GitHub Release with its CHANGELOG entry as the notes. The release workflow
   stops before publishing when the CHANGELOG has no entry for the version.
 
 ### Fixed
 
+- The README's links to `examples/quickstart.py` and `LICENSE` were relative and broke on PyPI;
+  every link in the README is absolute now. Its webhook example imports what it uses.
+- `examples/quickstart.py` no longer reads `DOCTRONIC_API_URL`, which the SDK never reads. Pass
+  `base_url=` to point the client somewhere else.
 - Building from the sdist accepts any hatchling from 1.27 (the first with PEP 639 license
   metadata) up to 2, instead of exactly 1.32.4.
 - The sdist no longer includes the repository's `.gitignore`.
