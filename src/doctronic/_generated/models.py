@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from enum import Enum
 from typing import Annotated, Any, Literal
 
+from doctronic._enums import Enum
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import TypeAliasType
 

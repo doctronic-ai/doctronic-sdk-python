@@ -1,0 +1,5837 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Doctronic API",
+    "version": "0.1.0",
+    "description": "Create users, run streaming clinical conversations, book appointments, and retrieve consultation documents."
+  },
+  "paths": {
+    "/users/": {
+      "get": {
+        "summary": "Get user details",
+        "description": "Retrieve the user account for the authenticated organization.\n\nThe user is identified via the `X-Doctronic-User-ID` header; no path parameter is used.\nReturns the same shape as the Create User response.",
+        "operationId": "partners_api_users_details_users__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForUserCreatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.member.header_required",
+                  "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "patients:read"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.member.not_found",
+                  "message": "User not found."
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "x-doctronic-required-scope": "patients:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      },
+      "post": {
+        "summary": "Create a user",
+        "description": "Create a user inside the organization identified by the Bearer token.\n\nAll fields are optional at creation time. `firstName`, `lastName`, `dateOfBirth`, and `phoneNumber` are required before appointment booking. When provided, `dateOfBirth` must represent an age from 18 through 120. The response lists any fields still needed for booking in `missingAppointmentFields`; add them later with `PATCH /users/`. This operation requires an organization Bearer token.",
+        "operationId": "partners_api_users_create_users__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForUserCreatedResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A user with this email or phone number already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.user.conflict",
+                  "message": "A user with this email or phone number already exists."
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "patients:create"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Phone validation is temporarily unavailable. Retry the same request later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation.phone_number.unavailable",
+                  "message": "Phone validation is temporarily unavailable. Retry the same request later."
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-doctronic-required-scope": "patients:create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      },
+      "patch": {
+        "summary": "Update organization-scoped user details",
+        "description": "Update the active user identified by `X-Doctronic-User-ID` within the authenticated organization's realm.\nOnly supplied fields change; omitted fields are preserved and explicit null clears a field.\nEmpty/blank names or phone numbers are rejected. Email/phone conflicts never merge or transfer accounts.\nOrganization servers must authenticate their member and derive this user ID server-side.\n\nThe user ID and existing chats remain unchanged. Corrections apply to the profile and future bookings,\nnot previously booked visits or historical clinical content. Return to the same completed chat to book\nafter correcting missing demographics; address, chat readiness and availability are still checked.\nThis does not verify ownership of a phone/email or change the supported-phone policy.\n\nRetry temporary 503s after `Retry-After`, keeping the same Idempotency-Key, user ID and request body.\nReplayed responses reflect the original update; GET /users/ returns the current profile.",
+        "operationId": "partners_api_users_update_users__patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForUserCreatedResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint. / A user with this email or phone number already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.member.header_required": {
+                    "summary": "Partner member header required",
+                    "value": {
+                      "code": "error.member.header_required",
+                      "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                    }
+                  },
+                  "error.user.conflict": {
+                    "summary": "User conflict",
+                    "value": {
+                      "code": "error.user.conflict",
+                      "message": "A user with this email or phone number already exists."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "patients:update"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.member.not_found",
+                  "message": "User not found."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Phone validation is temporarily unavailable. Retry the same request later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation.phone_number.unavailable",
+                  "message": "Phone validation is temporarily unavailable. Retry the same request later."
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "x-doctronic-required-scope": "patients:update",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/chats/": {
+      "post": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "Create a chat",
+        "description": "Create a chat for the user identified by `X-Doctronic-User-ID` within the organization identified by the Bearer token.\n\nThe optional `timezone` field accepts an IANA timezone and defaults to `UTC`. The optional `conversationPromptContext` field supplies context for the clinical conversation. Content that fails input validation returns `400 error.partner.validation`.\n\nThe response includes the chat's `id` and `createdAt`. Send the next message to `POST /chats/{chatId}/stream/` to begin streaming. Both authentication credentials are required.",
+        "operationId": "partners_api_chats_create_chats__post",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForChatResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint. / Validation error.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.member.header_required": {
+                    "summary": "Partner member header required",
+                    "value": {
+                      "code": "error.member.header_required",
+                      "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                    }
+                  },
+                  "error.partner.validation": {
+                    "summary": "Partner validation",
+                    "value": {
+                      "code": "error.partner.validation",
+                      "message": "Validation error."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "chats:create"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.member.not_found",
+                  "message": "User not found."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "x-doctronic-required-scope": "chats:create",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "List chats",
+        "description": "List chats available to the authenticated organization and user scope.\n\nUse `page`, `size`, and `orderBy` to paginate and sort the results. The response includes the current page of `items`, the unpaginated `total`, the computed page count, and next-page and previous-page indicators. Both authentication credentials are required.",
+        "operationId": "partners_api_chats_list_chats__get",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 20
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Order by field with - prefix. Allowed: createdAt, updatedAt",
+              "default": "-createdAt"
+            },
+            "description": "Order by field with - prefix. Allowed: createdAt, updatedAt"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForPage_ChatResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.member.header_required",
+                  "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "chats:read"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.member.not_found",
+                  "message": "User not found."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          }
+        },
+        "x-doctronic-required-scope": "chats:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ]
+      }
+    },
+    "/chats/{chatId}/": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "Get a chat",
+        "description": "Fetch a single chat by id.\n\nThe chat must have been created through this Doctronic API and belong to both the\nauthenticated organization and user. A chat that exists but belongs to another organization or\nuser is masked as `404 error.partner.chat_not_found` so callers cannot probe for the\nexistence of chats outside their scope.\n\n**Path parameters**\n- `chatId`: the chat id returned by `POST /chats/`.\n\n**Auth:** organization Bearer token + `X-Doctronic-User-ID` header (both required).",
+        "operationId": "partners_api_chats_get_chats__chatId___get",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForChatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.member.header_required",
+                  "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "chats:read"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found. / Chat not found.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.member.not_found": {
+                    "summary": "Partner member not found",
+                    "value": {
+                      "code": "error.member.not_found",
+                      "message": "User not found."
+                    }
+                  },
+                  "error.partner.chat_not_found": {
+                    "summary": "Partner chat not found",
+                    "value": {
+                      "code": "error.partner.chat_not_found",
+                      "message": "Chat not found."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          }
+        },
+        "x-doctronic-required-scope": "chats:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ]
+      }
+    },
+    "/chats/{chatId}/messages/": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "List chat messages",
+        "description": "List the user and assistant messages in a chat.\n\nMessages are returned oldest first unless `orderBy=-createdAt` is provided. Consultation artifacts are retrieved separately from `GET /artifacts/{artifactId}/`. The chat must belong to the authenticated organization and user scope.",
+        "operationId": "partners_api_chats_messages_chats__chatId__messages__get",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 20
+            },
+            "description": "Items per page"
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Order by field with - prefix. Allowed: createdAt",
+              "default": "createdAt"
+            },
+            "description": "Order by field with - prefix. Allowed: createdAt"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForPage_MessageResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.member.header_required",
+                  "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "chats:read"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found. / Chat not found.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.member.not_found": {
+                    "summary": "Partner member not found",
+                    "value": {
+                      "code": "error.member.not_found",
+                      "message": "User not found."
+                    }
+                  },
+                  "error.partner.chat_not_found": {
+                    "summary": "Partner chat not found",
+                    "value": {
+                      "code": "error.partner.chat_not_found",
+                      "message": "Chat not found."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          }
+        },
+        "x-doctronic-required-scope": "chats:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ]
+      }
+    },
+    "/chats/{chatId}/stream/": {
+      "post": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "Stream a chat turn (SSE)",
+        "description": "Send a user message to an existing chat and stream the assistant's reply as\nServer-Sent Events.\n\nThe response is `text/event-stream` (not the standard JSON envelope). Each event is a\nframe of the form `event: <type>` followed by a camelCase JSON `data:` payload. The\nconnection stays open for the whole assistant turn and closes when the turn ends.\n\n**Event types** (see the 200 response examples for full payloads):\n- `message.start` / `message.content` / `message.stop`: the assistant message lifecycle\n  and its streamed text chunks.\n- `conversation.offtopic`: the message was classified as off-topic.\n- `conversation.end`: the assistant ended the conversation (`reason` explains why).\n- `guardian`: a safety condition was detected; `guardianId` is stable.\n- `error`: an error; the stream ends after it. `errorCode` is `error.rate_limited`\n  (may include `retryAfterSeconds`), `error.internal` (the reply failed; retry the turn), or\n  `error.consultation_not_ready` (the consultation could not be finalized; booking is\n  unavailable).\n- `skill_code.cta`: an end-of-flow call to action (e.g. see a Doctronic doctor, or book\n  an in-person visit); carries `skillCode`, `widget`, and an optional `text` label.\n- `ai_consultation.complete`: consultation completion with document IDs. Document retrieval can still return `202` while generation finishes.\n\n**Event compatibility:** Published event names are stable wire identifiers. New event names\nmay be added. A replacement will be introduced additively and the old name explicitly\ndeprecated; published names will not be silently renamed. Consumers should ignore event\nnames they do not recognize.\n\n**Request body**\n- `userEvent`: the user message: `type` `user_message`, `userInput`, and optional\n  `messagePromptContext` (up to 50,000 characters) with situational context for this turn.\n- `timezone`: optional IANA timezone (default `UTC`); an invalid value returns `400`.\n\nThe chat must have been created through this Doctronic API and belong to both the\nauthenticated organization and user; otherwise it is masked as\n`404 error.partner.chat_not_found`.\n\n**Auth:** organization Bearer token + `X-Doctronic-User-ID` header (both required).",
+        "operationId": "partners_api_chats_stream_chats__chatId__stream__post",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StreamChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE stream of chat events. The type field identifies the event.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "message.start": {
+                    "summary": "Assistant message started",
+                    "value": "event: message.start\ndata: {\"type\":\"message.start\",\"role\":\"assistant\",\"messageId\":\"ac_hist_01K6JGGM2G2DB4Y9KB9H9MJJ6Q\",\"messageTimestamp\":1741856873000}\n\n"
+                  },
+                  "message.content": {
+                    "summary": "Assistant message content chunk",
+                    "value": "event: message.content\ndata: {\"type\":\"message.content\",\"messageId\":\"ac_hist_01K6JGGM2G2DB4Y9KB9H9MJJ6Q\",\"content\":\"Hello! How can I help you today?\"}\n\n"
+                  },
+                  "message.stop": {
+                    "summary": "Assistant message finished",
+                    "value": "event: message.stop\ndata: {\"type\":\"message.stop\",\"messageId\":\"ac_hist_01K6JGGM2G2DB4Y9KB9H9MJJ6Q\"}\n\n"
+                  },
+                  "conversation.end": {
+                    "summary": "Conversation ended by the assistant",
+                    "value": "event: conversation.end\ndata: {\"type\":\"conversation.end\",\"messageId\":\"ac_hist_01K6JGGM2G2DB4Y9KB9H9MJJ6Q\",\"reason\":\"AGENT_STOP_CODE\"}\n\n"
+                  },
+                  "conversation.offtopic": {
+                    "summary": "Off-topic message detected",
+                    "value": "event: conversation.offtopic\ndata: {\"type\":\"conversation.offtopic\",\"messageId\":\"ac_hist_01K6JGGM2G2DB4Y9KB9H9MJJ6Q\"}\n\n"
+                  },
+                  "guardian": {
+                    "summary": "Safety guardian signal",
+                    "value": "event: guardian\ndata: {\"type\":\"guardian\",\"guardianId\":\"emergency_breathing\",\"message\":\"Please call emergency services now.\"}\n\n"
+                  },
+                  "error": {
+                    "summary": "Recoverable error (rate limited)",
+                    "value": "event: error\ndata: {\"type\":\"error\",\"errorCode\":\"error.rate_limited\",\"message\":\"The service is busy right now. Please retry in a few moments.\",\"retryAfterSeconds\":7}\n\n"
+                  },
+                  "error_internal": {
+                    "summary": "Internal error (retry the turn)",
+                    "value": "event: error\ndata: {\"type\":\"error\",\"errorCode\":\"error.internal\",\"message\":\"Something went wrong generating the response. Please retry.\"}\n\n"
+                  },
+                  "skill_code.cta": {
+                    "summary": "End-of-flow call to action",
+                    "value": "event: skill_code.cta\ndata: {\"type\":\"skill_code.cta\",\"skillCode\":\"109\",\"widget\":\"cta_doctor_visit_in_person_widget\",\"text\":\"See doctor in person\"}\n\n"
+                  },
+                  "ai_consultation.complete": {
+                    "summary": "Consultation complete with document IDs",
+                    "value": "event: ai_consultation.complete\ndata: {\"type\":\"ai_consultation.complete\",\"artifacts\":{\"longSummary\":\"art_01K6JGGM2G2DB4Y9KB9H9MJJ6Q\",\"shortSummary\":\"art_01K6JGGP7Q4R8S2T5V7W9X1Y3\",\"soapNote\":\"art_01K6JGGR9Z6B2C4D6F8H0J2K4M\"}}\n\n"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint. / Validation error.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.member.header_required": {
+                    "summary": "Partner member header required",
+                    "value": {
+                      "code": "error.member.header_required",
+                      "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                    }
+                  },
+                  "error.partner.validation": {
+                    "summary": "Partner validation",
+                    "value": {
+                      "code": "error.partner.validation",
+                      "message": "Validation error."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "chats:send_message"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found. / Chat not found.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.member.not_found": {
+                    "summary": "Partner member not found",
+                    "value": {
+                      "code": "error.member.not_found",
+                      "message": "User not found."
+                    }
+                  },
+                  "error.partner.chat_not_found": {
+                    "summary": "Partner chat not found",
+                    "value": {
+                      "code": "error.partner.chat_not_found",
+                      "message": "Chat not found."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A stream is already in progress for this chat. Wait for it to finish before retrying.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.partner.chat_stream_in_progress",
+                  "message": "A stream is already in progress for this chat. Wait for it to finish before retrying."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Chat streaming is temporarily unavailable. Please retry shortly.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.partner.chat_stream_unavailable",
+                  "message": "Chat streaming is temporarily unavailable. Please retry shortly."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-doctronic-required-scope": "chats:send_message",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ]
+      }
+    },
+    "/appointments/scheduled/available-slots/": {
+      "get": {
+        "summary": "List available scheduled appointment slots",
+        "description": "Returns available appointment start times filtered to practitioners credentialed in the provided US state.",
+        "operationId": "partners_api_appointments_available_slots_appointments_scheduled_available_slots__get",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "datetimeFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "datetimeTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForAvailableSlotsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "User address on file is incomplete. / User has no address on file.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.appointments.incomplete_address": {
+                    "summary": "Incomplete address",
+                    "value": {
+                      "code": "error.appointments.incomplete_address",
+                      "message": "User address on file is incomplete."
+                    }
+                  },
+                  "error.appointments.missing_address": {
+                    "summary": "Missing address",
+                    "value": {
+                      "code": "error.appointments.missing_address",
+                      "message": "User has no address on file."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "appointments:read"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          }
+        },
+        "x-doctronic-required-scope": "appointments:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/scheduled/": {
+      "post": {
+        "summary": "Book a scheduled appointment",
+        "description": "Creates a scheduled appointment for a specific future time slot.\nThe slot must be one returned by GET /appointments/scheduled/available-slots/\nfor the provided location.state.",
+        "operationId": "partners_api_appointments_create_scheduled_appointments_scheduled__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduledAppointmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForScheduledAppointmentResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Required patient demographics are missing from user record. / User address on file is incomplete. / User has no address on file. / Chat is not ready for appointment booking. / startsAt is not a slot returned by GET /appointments/scheduled/available-slots/. / No practitioners are currently available in the requested state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.appointments.missing_patient_demographics": {
+                    "summary": "Missing patient demographics",
+                    "value": {
+                      "code": "error.appointments.missing_patient_demographics",
+                      "message": "Required patient demographics are missing from user record."
+                    }
+                  },
+                  "error.appointments.incomplete_address": {
+                    "summary": "Incomplete address",
+                    "value": {
+                      "code": "error.appointments.incomplete_address",
+                      "message": "User address on file is incomplete."
+                    }
+                  },
+                  "error.appointments.missing_address": {
+                    "summary": "Missing address",
+                    "value": {
+                      "code": "error.appointments.missing_address",
+                      "message": "User has no address on file."
+                    }
+                  },
+                  "error.appointments.chat_not_ready": {
+                    "summary": "Chat not ready",
+                    "value": {
+                      "code": "error.appointments.chat_not_ready",
+                      "message": "Chat is not ready for appointment booking."
+                    }
+                  },
+                  "error.appointments.invalid_slot": {
+                    "summary": "Invalid slot",
+                    "value": {
+                      "code": "error.appointments.invalid_slot",
+                      "message": "startsAt is not a slot returned by GET /appointments/scheduled/available-slots/."
+                    }
+                  },
+                  "error.appointments.no_practitioners_available": {
+                    "summary": "No practitioners available",
+                    "value": {
+                      "code": "error.appointments.no_practitioners_available",
+                      "message": "No practitioners are currently available in the requested state."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "appointments:book"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Chat not found or does not belong to this user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.appointments.chat_not_found",
+                  "message": "Chat not found or does not belong to this user."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The selected slot is no longer available. Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.appointments.slot_unavailable",
+                  "message": "The selected slot is no longer available."
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "502": {
+            "description": "Appointment could not be booked because the clinical service did not accept the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.appointments.provisioning_failed",
+                  "message": "Appointment could not be booked because the clinical service did not accept the request."
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "x-doctronic-required-scope": "appointments:book",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/asap/": {
+      "post": {
+        "summary": "Book an ASAP appointment",
+        "description": "Places the patient in a shared waiting room immediately.\nA practitioner credentialed in the given state will join when available: there is no guaranteed wait time.",
+        "operationId": "partners_api_appointments_create_asap_appointments_asap__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsapAppointmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForAsapAppointmentResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Required patient demographics are missing from user record. / User address on file is incomplete. / User has no address on file. / Chat is not ready for appointment booking. / No practitioners are currently available in the requested state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.appointments.missing_patient_demographics": {
+                    "summary": "Missing patient demographics",
+                    "value": {
+                      "code": "error.appointments.missing_patient_demographics",
+                      "message": "Required patient demographics are missing from user record."
+                    }
+                  },
+                  "error.appointments.incomplete_address": {
+                    "summary": "Incomplete address",
+                    "value": {
+                      "code": "error.appointments.incomplete_address",
+                      "message": "User address on file is incomplete."
+                    }
+                  },
+                  "error.appointments.missing_address": {
+                    "summary": "Missing address",
+                    "value": {
+                      "code": "error.appointments.missing_address",
+                      "message": "User has no address on file."
+                    }
+                  },
+                  "error.appointments.chat_not_ready": {
+                    "summary": "Chat not ready",
+                    "value": {
+                      "code": "error.appointments.chat_not_ready",
+                      "message": "Chat is not ready for appointment booking."
+                    }
+                  },
+                  "error.appointments.no_practitioners_available": {
+                    "summary": "No practitioners available",
+                    "value": {
+                      "code": "error.appointments.no_practitioners_available",
+                      "message": "No practitioners are currently available in the requested state."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "appointments:book"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Chat not found or does not belong to this user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.appointments.chat_not_found",
+                  "message": "Chat not found or does not belong to this user."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "502": {
+            "description": "Appointment could not be booked because the clinical service did not accept the request. / Appointment is booked, but a secure waiting-room URL is unavailable. Retrieve this appointment before retrying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithAppointmentWaitingRoomUnavailableData"
+                },
+                "examples": {
+                  "error.appointments.provisioning_failed": {
+                    "summary": "Appointment provisioning failed",
+                    "value": {
+                      "code": "error.appointments.provisioning_failed",
+                      "message": "Appointment could not be booked because the clinical service did not accept the request."
+                    }
+                  },
+                  "error.appointments.waiting_room_unavailable": {
+                    "summary": "Appointment waiting room unavailable",
+                    "value": {
+                      "code": "error.appointments.waiting_room_unavailable",
+                      "message": "Appointment is booked, but a secure waiting-room URL is unavailable. Retrieve this appointment before retrying.",
+                      "data": {
+                        "appointmentId": "dc_01K1EXAMPLE00000000000000",
+                        "status": "booked"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "x-doctronic-required-scope": "appointments:book",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/": {
+      "get": {
+        "summary": "List appointments",
+        "description": "List appointments for the user identified by `X-Doctronic-User-ID` within the authenticated organization.\n\nUse `status` to filter by appointment status, and `page` and `size` to paginate the results. Both authentication credentials are required.",
+        "operationId": "partners_api_appointments_list_appointments__get",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AppointmentAPIStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Page number",
+              "default": 1
+            },
+            "description": "Page number"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page",
+              "default": 20
+            },
+            "description": "Items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForPage_AppointmentResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "appointments:read"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Appointment not found.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.appointments.not_found",
+                  "message": "Appointment not found."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          }
+        },
+        "x-doctronic-required-scope": "appointments:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/{appointment_id}/": {
+      "get": {
+        "summary": "Get appointment details",
+        "description": "Fetch a single appointment by id",
+        "operationId": "partners_api_appointment_details_appointments__appointment_id___get",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForAppointmentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "appointments:read"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Appointment not found.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.appointments.not_found",
+                  "message": "Appointment not found."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          }
+        },
+        "x-doctronic-required-scope": "appointments:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/{appointment_id}/result/": {
+      "get": {
+        "summary": "Get appointment result",
+        "description": "Retrieve the post-visit result for an appointment.\n\nThe result lists each prescription's display name and pharmacy destination, plus a stable artifact identifier for the clinician-finalized note once it is available. The clinician note is separate from the pre-visit AI SOAP-note artifact. Retrieve it with `GET /artifacts/{artifactId}/`; the `artifact.ready` event signals when its content is ready. The result reflects the clinical data recorded when the clinician finalized the note.\n\nA `200` response means the appointment is fulfilled and its result is available. A `202` response means the result is not available yet and the client should retry later with bounded backoff. A `404` response means the appointment is unavailable in the authenticated organization and user scope. A `409` response means the appointment was cancelled or was a no-show, so no result will become available. Both authentication credentials are required.",
+        "operationId": "partners_api_appointment_result_appointments__appointment_id__result__get",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForAppointmentResultResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Appointment result is not visible yet; retry later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_AppointmentResultPendingResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "appointments:read"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Appointment not found.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.appointments.not_found",
+                  "message": "Appointment not found."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Appointment has no available result.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.appointments.result_unavailable",
+                  "message": "Appointment has no available result."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          }
+        },
+        "x-doctronic-required-scope": "appointments:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/{appointment_id}/cancel/": {
+      "post": {
+        "summary": "Cancel appointment",
+        "description": "Cancel a booked appointment",
+        "operationId": "partners_api_appointments_cancel_appointments__appointment_id__cancel__post",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessfulEmptyResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "appointments:cancel"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Appointment not found. / Appointment patient not found.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.appointments.not_found": {
+                    "summary": "Appointment not found",
+                    "value": {
+                      "code": "error.appointments.not_found",
+                      "message": "Appointment not found."
+                    }
+                  },
+                  "error.appointments.patient_not_found": {
+                    "summary": "Appointment patient record not found",
+                    "value": {
+                      "code": "error.appointments.patient_not_found",
+                      "message": "Appointment patient not found."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Appointment cannot be cancelled or rescheduled. Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.appointments.cannot_be_cancelled_or_rescheduled",
+                  "message": "Appointment cannot be cancelled or rescheduled."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "x-doctronic-required-scope": "appointments:cancel",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/appointments/{appointment_id}/reschedule/": {
+      "post": {
+        "summary": "Reschedule appointment",
+        "description": "Reschedule a booked appointment to a new time slot",
+        "operationId": "partners_api_appointments_reschedule_appointments__appointment_id__reschedule__post",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleAppointmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessfulEmptyResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No practitioners are currently available in the requested state.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.appointments.no_practitioners_available",
+                  "message": "No practitioners are currently available in the requested state."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "appointments:reschedule"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Appointment not found. / Appointment patient not found.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.appointments.not_found": {
+                    "summary": "Appointment not found",
+                    "value": {
+                      "code": "error.appointments.not_found",
+                      "message": "Appointment not found."
+                    }
+                  },
+                  "error.appointments.patient_not_found": {
+                    "summary": "Appointment patient record not found",
+                    "value": {
+                      "code": "error.appointments.patient_not_found",
+                      "message": "Appointment patient not found."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Appointment cannot be cancelled or rescheduled. / Timeslot unavailable. Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.appointments.cannot_be_cancelled_or_rescheduled": {
+                    "summary": "Appointment cannot be cancelled or rescheduled",
+                    "value": {
+                      "code": "error.appointments.cannot_be_cancelled_or_rescheduled",
+                      "message": "Appointment cannot be cancelled or rescheduled."
+                    }
+                  },
+                  "error.appointments.unavailable_time": {
+                    "summary": "Appointment unavailable rescheduling time",
+                    "value": {
+                      "code": "error.appointments.unavailable_time",
+                      "message": "Timeslot unavailable."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "x-doctronic-required-scope": "appointments:reschedule",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "tags": [
+          "appointments"
+        ]
+      }
+    },
+    "/address/": {
+      "get": {
+        "summary": "Get a user's address",
+        "description": "Retrieve the address currently on file for the authenticated user.\n\nThe user is identified via the `X-Doctronic-User-ID` header; no path parameter is used.\nReturns a 404 if no address is on file for the user.",
+        "operationId": "partners_api_address_get_address__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForAddressResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.member.header_required",
+                  "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "addresses:read"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found. / No address on file for this user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.member.not_found": {
+                    "summary": "Partner member not found",
+                    "value": {
+                      "code": "error.member.not_found",
+                      "message": "User not found."
+                    }
+                  },
+                  "error.address.not_found": {
+                    "summary": "Address not found",
+                    "value": {
+                      "code": "error.address.not_found",
+                      "message": "No address on file for this user."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "x-doctronic-required-scope": "addresses:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "tags": [
+          "address"
+        ]
+      },
+      "put": {
+        "summary": "Set a user's address",
+        "description": "Create or replace the address on file for the authenticated user (upsert).\n\nAll fields are optional individually, but a full address (`line1`, `city`, `state`, `postalCode`) \nis required before the user can book an appointment; that is enforced at booking time.",
+        "operationId": "partners_api_address_set_address__put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "examples": {
+                  "success": {
+                    "summary": "Actual success response",
+                    "value": {
+                      "code": "success",
+                      "message": "Request successful",
+                      "data": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
+            "x-doctronic-runtime-response": {
+              "description": "The server returns the standard success envelope while the legacy schema remains unchanged.",
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "message",
+                  "data"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "const": "success"
+                  },
+                  "message": {
+                    "type": "string",
+                    "const": "Request successful"
+                  },
+                  "data": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "addresses:update"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "x-doctronic-required-scope": "addresses:update",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "tags": [
+          "address"
+        ]
+      }
+    },
+    "/pharmacy/search/": {
+      "post": {
+        "summary": "Search pharmacies",
+        "description": "Search pharmacies near a location, optionally by name.\n\n`latitude` and `longitude` are required. Provide `searchTerm` to match pharmacy names; without it, results are ranked by proximity. Provide `state` to limit the results to one US state. Use the returned `ncpdpId` when saving a user's preferred pharmacy. This operation requires an organization Bearer token.",
+        "operationId": "partners_api_pharmacy_search_pharmacy_search__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PharmacySearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForPharmacySearchResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "pharmacies:search"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "x-doctronic-required-scope": "pharmacies:search",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "tags": [
+          "pharmacy"
+        ]
+      }
+    },
+    "/pharmacy/": {
+      "put": {
+        "summary": "Set a user's pharmacy",
+        "description": "Save or replace the authenticated user's preferred pharmacy.\n\nProvide the `ncpdpId` returned by `POST /pharmacy/search/`. The user must already have `firstName`, `lastName`, `dateOfBirth`, and `sex` on file. Both authentication credentials are required.",
+        "operationId": "partners_api_pharmacy_set_pharmacy__put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PharmacySetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {},
+                "examples": {
+                  "success": {
+                    "summary": "Actual success response",
+                    "value": {
+                      "code": "success",
+                      "message": "Request successful",
+                      "data": null
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
+            "x-doctronic-runtime-response": {
+              "description": "The server returns the standard success envelope while the legacy schema remains unchanged.",
+              "schema": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "message",
+                  "data"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "const": "success"
+                  },
+                  "message": {
+                    "type": "string",
+                    "const": "Request successful"
+                  },
+                  "data": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Required patient demographics (first name, last name, date of birth, sex) are missing from user record.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.pharmacy.missing_patient_demographics",
+                  "message": "Required patient demographics (first name, last name, date of birth, sex) are missing from user record."
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "pharmacies:set_preferred"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No pharmacy found for the provided NCPDP id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.pharmacy.not_found",
+                  "message": "No pharmacy found for the provided NCPDP id."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "x-doctronic-required-scope": "pharmacies:set_preferred",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "tags": [
+          "pharmacy"
+        ]
+      }
+    },
+    "/coverage/": {
+      "put": {
+        "summary": "Set user insurance coverage",
+        "description": "Submit or replace the authenticated user's active primary self-coverage record.\n\nThe user is identified by `X-Doctronic-User-ID`. Send all required coverage fields on\nevery request. Repeated requests update the same record and leave unrelated coverage\nrecords unchanged. The user must already have first name, last name, date of birth,\nand sex on file.\n\nThis endpoint stores coverage information. It does not verify eligibility or benefits,\ndiscover insurance, return or delete coverage, support secondary policies or dependents,\nor accept effective dates.",
+        "operationId": "partners_api_coverage_set_coverage__put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoverageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessfulEmptyResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint. / Required patient demographics (first name, last name, date of birth, sex) are missing from user record.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.member.header_required": {
+                    "summary": "Partner member header required",
+                    "value": {
+                      "code": "error.member.header_required",
+                      "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                    }
+                  },
+                  "error.coverage.missing_patient_demographics": {
+                    "summary": "Missing patient demographics",
+                    "value": {
+                      "code": "error.coverage.missing_patient_demographics",
+                      "message": "Required patient demographics (first name, last name, date of birth, sex) are missing from user record."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                },
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "coverage:update"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.member.not_found",
+                  "message": "User not found."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "x-doctronic-required-scope": "coverage:update",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "tags": [
+          "coverage"
+        ]
+      }
+    },
+    "/artifacts/{artifactId}/": {
+      "get": {
+        "tags": [
+          "artifacts"
+        ],
+        "summary": "Get a consultation artifact",
+        "description": "Retrieve a consultation artifact: a long summary, short summary, AI SOAP note, or clinician-finalized note.\n\nAI artifact identifiers are delivered in the `ai_consultation.complete` stream event. The clinician note identifier is returned by `GET /appointments/{appointment_id}/result/` after the visit is finalized.\n\nA `200` response contains Markdown in `data.content.body`. A `202` response means generation is still in progress and the client should retry later with bounded backoff. A `404` response means the artifact is unavailable in the authenticated organization and user scope. A `500` response means generation failed.",
+        "operationId": "partners_api_get_artifact_artifacts__artifactId___get",
+        "security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifactId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForArtifactResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Artifact is still being generated; retry later."
+          },
+          "400": {
+            "description": "The X-Doctronic-User-ID header is required for this endpoint.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.member.header_required",
+                  "message": "The X-Doctronic-User-ID header is required for this endpoint."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unauthorized.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.unauthorized",
+                  "message": "Unauthorized."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This API key does not have the scope this endpoint requires.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.auth.insufficient_scope",
+                  "message": "This API key does not have the scope this endpoint requires.",
+                  "data": {
+                    "requiredScope": "artifacts:read"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithInsufficientScopeData"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found. / Artifact not found, does not belong to this organization, or does not belong to the given user.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.member.not_found": {
+                    "summary": "Partner member not found",
+                    "value": {
+                      "code": "error.member.not_found",
+                      "message": "User not found."
+                    }
+                  },
+                  "error.artifact.not_found": {
+                    "summary": "Artifact not found",
+                    "value": {
+                      "code": "error.artifact.not_found",
+                      "message": "Artifact not found, does not belong to this partner, or does not belong to the given user."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "500": {
+            "description": "Artifact generation failed permanently.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.internal",
+                  "message": "Artifact generation failed permanently."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-doctronic-required-scope": "artifacts:read",
+        "x-doctronic-runtime-security": [
+          {
+            "HTTPBearer": [],
+            "XDoctronicUserID": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddressRequest": {
+        "properties": {
+          "line1": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required before booking"
+          },
+          "line2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required before booking"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "US state code, e.g. 'CA'. Required before booking."
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required before booking"
+          }
+        },
+        "type": "object",
+        "title": "AddressRequest",
+        "description": "Request body for setting a user's on-file address (upsert).\n\nAll fields are optional individually, but a full address (`line1`, `city`, `state`,\n`postalCode`) is required before the user can book an appointment; that is enforced\nat booking time. `state` must be a valid US state code."
+      },
+      "AddressResponse": {
+        "properties": {
+          "line1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "line2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "AddressResponse",
+        "description": "The address currently on file for a user. Any field may be `null` if it was never supplied."
+      },
+      "AppointmentAPIStatus": {
+        "type": "string",
+        "enum": [
+          "booked",
+          "cancelled",
+          "fulfilled",
+          "noshow",
+          "unknown"
+        ],
+        "title": "AppointmentAPIStatus",
+        "description": "Appointment status values returned by the Doctronic API. Clients should handle `unknown` without assuming an internal workflow state."
+      },
+      "AppointmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chatId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentAPIStatus"
+          },
+          "durationMinutes": {
+            "type": "integer"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationSchema"
+          },
+          "startsAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "endsAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "waitingRoomUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Direct HTTPS URL for joining the appointment. Null until the waiting room is ready.",
+            "examples": [
+              "https://doctronic.doxy.me/example?pid=dc_01K1EXAMPLE00000000000000&autocheckin=true"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "chatId",
+          "status",
+          "durationMinutes",
+          "location"
+        ],
+        "title": "AppointmentResponse",
+        "description": "Appointment response used by list and detail operations. For ASAP appointments, `startsAt` and `endsAt` are `null`. `waitingRoomUrl` is present once a join link is ready, currently expires one hour after issuance, and may rotate when reissued."
+      },
+      "AppointmentResultPendingResponse": {
+        "properties": {
+          "appointmentId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentAPIStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "appointmentId",
+          "status"
+        ],
+        "title": "AppointmentResultPendingResponse"
+      },
+      "AppointmentResultPharmacy": {
+        "properties": {
+          "ncpdpId": {
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentResultPharmacyAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "ncpdpId"
+        ],
+        "title": "AppointmentResultPharmacy",
+        "description": "Pharmacy selected for one prescription, as recorded by Canvas at note lock."
+      },
+      "AppointmentResultPharmacyAddress": {
+        "properties": {
+          "line1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "AppointmentResultPharmacyAddress"
+      },
+      "AppointmentResultPrescription": {
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "pharmacy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentResultPharmacy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The destination selected by the clinician for this prescription. This is distinct from the user's preferred pharmacy."
+          }
+        },
+        "type": "object",
+        "required": [
+          "displayName"
+        ],
+        "title": "AppointmentResultPrescription"
+      },
+      "AppointmentResultResponse": {
+        "properties": {
+          "appointmentId": {
+            "type": "string"
+          },
+          "prescriptions": {
+            "items": {
+              "$ref": "#/components/schemas/AppointmentResultPrescription"
+            },
+            "type": "array"
+          },
+          "clinicianNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stable artifact id for the clinician-finalized note. This is distinct from the pre-visit AI SOAP-note artifact and can be fetched from GET /artifacts/{artifactId}/."
+          }
+        },
+        "type": "object",
+        "required": [
+          "appointmentId",
+          "prescriptions"
+        ],
+        "title": "AppointmentResultResponse"
+      },
+      "AppointmentWaitingRoomUnavailableData": {
+        "properties": {
+          "appointmentId": {
+            "type": "string",
+            "examples": [
+              "dc_01K1EXAMPLE00000000000000"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "const": "booked",
+            "default": "booked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "appointmentId"
+        ],
+        "title": "AppointmentWaitingRoomUnavailableData"
+      },
+      "ArtifactContent": {
+        "properties": {
+          "chatId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chatId",
+          "createdAt",
+          "body"
+        ],
+        "title": "ArtifactContent"
+      },
+      "ArtifactResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SoapNoteArtifactResponse"
+          },
+          {
+            "$ref": "#/components/schemas/ClinicianNoteArtifactResponse"
+          },
+          {
+            "$ref": "#/components/schemas/LongSummaryArtifactResponse"
+          },
+          {
+            "$ref": "#/components/schemas/ShortSummaryArtifactResponse"
+          }
+        ],
+        "title": "ArtifactResponse",
+        "discriminator": {
+          "propertyName": "artifactType",
+          "mapping": {
+            "clinician_note": "#/components/schemas/ClinicianNoteArtifactResponse",
+            "long_summary": "#/components/schemas/LongSummaryArtifactResponse",
+            "short_summary": "#/components/schemas/ShortSummaryArtifactResponse",
+            "soap_note": "#/components/schemas/SoapNoteArtifactResponse"
+          }
+        }
+      },
+      "AsapAppointmentRequest": {
+        "properties": {
+          "chatId": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chatId",
+          "location"
+        ],
+        "title": "AsapAppointmentRequest"
+      },
+      "AsapAppointmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chatId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentAPIStatus"
+          },
+          "durationMinutes": {
+            "type": "integer"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationSchema"
+          },
+          "waitingRoomUrl": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "description": "Direct HTTPS URL for joining the appointment.",
+            "examples": [
+              "https://doctronic.doxy.me/example?pid=dc_01K1EXAMPLE00000000000000&autocheckin=true"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "chatId",
+          "status",
+          "durationMinutes",
+          "location",
+          "waitingRoomUrl"
+        ],
+        "title": "AsapAppointmentResponse"
+      },
+      "AvailableSlotsResponse": {
+        "properties": {
+          "slots": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slots"
+        ],
+        "title": "AvailableSlotsResponse"
+      },
+      "ChatResponse": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "createdAt"
+        ],
+        "title": "ChatResponse"
+      },
+      "ClinicianNoteArtifactResponse": {
+        "properties": {
+          "artifactType": {
+            "type": "string",
+            "const": "clinician_note",
+            "default": "clinician_note"
+          },
+          "artifactId": {
+            "type": "string"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ArtifactContent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifactId",
+          "content"
+        ],
+        "title": "ClinicianNoteArtifactResponse"
+      },
+      "CoverageRequest": {
+        "properties": {
+          "payerId": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "description": "Claim.MD/EDI payer identifier supplied or confirmed during integration setup.",
+            "examples": [
+              "00590"
+            ]
+          },
+          "payerName": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "description": "Display name of the insurance payer associated with payerId.",
+            "examples": [
+              "Example Health Plan"
+            ]
+          },
+          "memberId": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "description": "Insurance member number printed on the patient's plan card; not a Doctronic user ID.",
+            "examples": [
+              "ABC1234567"
+            ]
+          },
+          "groupNumber": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Insurance group number. Omit, set to null, or send a blank value to clear it.",
+            "examples": [
+              "GROUP-42"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "payerId",
+          "payerName",
+          "memberId"
+        ],
+        "title": "CoverageRequest",
+        "description": "Primary insurance coverage supplied for the authenticated user."
+      },
+      "CreateChatRequest": {
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "default": "UTC"
+          },
+          "conversationPromptContext": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "CreateChatRequest"
+      },
+      "CreateUserRequest": {
+        "properties": {
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dateOfBirth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "description": "Patient date of birth"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ISO 8601 date"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "E.164 format, e.g. +15555550100. Required for appointment booking, not account creation. When carrier lookup is enabled, the configured line-type allowlist applies; normally mobile, fixed VoIP and non-fixed VoIP. Landlines are not supported by the default policy."
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sex assigned at birth, not gender"
+          }
+        },
+        "type": "object",
+        "title": "CreateUserRequest",
+        "description": "Request body for a user in your organization. All fields are optional at creation time. `firstName`, `lastName`, `dateOfBirth`, and `phoneNumber` are required later for appointment booking. When provided, `dateOfBirth` must represent an age from 18 through 120."
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "default": "error.unknown"
+          },
+          "message": {
+            "type": "string",
+            "default": "Request failed"
+          },
+          "data": {}
+        },
+        "type": "object",
+        "title": "ErrorResponse",
+        "description": "Standard error response model"
+      },
+      "ErrorResponseWithAppointmentWaitingRoomUnavailableData": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "default": "error"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentWaitingRoomUnavailableData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ErrorResponseWithAppointmentWaitingRoomUnavailableData"
+      },
+      "ErrorResponseWithInsufficientScopeData": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "default": "error"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InsufficientScopeData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ErrorResponseWithInsufficientScopeData"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InsufficientScopeData": {
+        "properties": {
+          "requiredScope": {
+            "$ref": "#/components/schemas/Scope"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requiredScope"
+        ],
+        "title": "InsufficientScopeData"
+      },
+      "LocationSchema": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "LocationSchema"
+      },
+      "LongSummaryArtifactResponse": {
+        "properties": {
+          "artifactType": {
+            "type": "string",
+            "const": "long_summary",
+            "default": "long_summary"
+          },
+          "artifactId": {
+            "type": "string"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ArtifactContent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifactId",
+          "content"
+        ],
+        "title": "LongSummaryArtifactResponse"
+      },
+      "MessageResponse": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content",
+          "messageId"
+        ],
+        "title": "MessageResponse"
+      },
+      "Page_AppointmentResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppointmentResponse"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "pages": {
+            "type": "integer"
+          },
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrev": {
+            "type": "boolean"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size",
+          "pages",
+          "hasNext",
+          "hasPrev"
+        ],
+        "title": "Page[AppointmentResponse]"
+      },
+      "Page_ChatResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChatResponse"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "pages": {
+            "type": "integer"
+          },
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrev": {
+            "type": "boolean"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size",
+          "pages",
+          "hasNext",
+          "hasPrev"
+        ],
+        "title": "Page[ChatResponse]"
+      },
+      "Page_MessageResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MessageResponse"
+            },
+            "type": "array"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "pages": {
+            "type": "integer"
+          },
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrev": {
+            "type": "boolean"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size",
+          "pages",
+          "hasNext",
+          "hasPrev"
+        ],
+        "title": "Page[MessageResponse]"
+      },
+      "PartnerUserMessageEvent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UserMessageEvent"
+          }
+        ],
+        "title": "PartnerUserMessageEvent",
+        "description": "Deprecated compatibility alias. Use `UserMessageEvent` for new integrations.",
+        "deprecated": true
+      },
+      "Pharmacy": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "ncpdpId": {
+            "type": "string"
+          },
+          "address": {
+            "$ref": "#/components/schemas/PharmacyAddress"
+          },
+          "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "distanceMiles": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "ncpdpId",
+          "address"
+        ],
+        "title": "Pharmacy"
+      },
+      "PharmacyAddress": {
+        "properties": {
+          "line1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "PharmacyAddress"
+      },
+      "PharmacySearchRequest": {
+        "properties": {
+          "searchTerm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "String to search pharmacy name by"
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90,
+            "minimum": -90,
+            "description": "Latitude in WGS84 decimal degrees (e.g. 40.7608), range [-90, 90]. Required."
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180,
+            "minimum": -180,
+            "description": "Longitude in WGS84 decimal degrees (e.g. -111.8910), range [-180, 180]. Required."
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "US state code, e.g. 'NY', where the pharmacy is located."
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "title": "PharmacySearchRequest",
+        "description": "Request body for searching pharmacies, used to route any prescriptions resulting\nfrom an appointment.\n\n`latitude` and `longitude` are always required. `search_term` is optional; when\nomitted, results are sorted by proximity to the given location. `state` optionally\nfilters results to a single US state."
+      },
+      "PharmacySearchResponse": {
+        "properties": {
+          "pharmacies": {
+            "items": {
+              "$ref": "#/components/schemas/Pharmacy"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pharmacies"
+        ],
+        "title": "PharmacySearchResponse"
+      },
+      "PharmacySetRequest": {
+        "properties": {
+          "ncpdpId": {
+            "type": "string",
+            "pattern": "^\\d{7}$",
+            "description": "NCPDP 7-digit pharmacy ID. Obtained from `POST /pharmacy/search/`."
+          }
+        },
+        "type": "object",
+        "required": [
+          "ncpdpId"
+        ],
+        "title": "PharmacySetRequest",
+        "description": "Request body for setting the pharmacy on file for the authenticated user (upsert)."
+      },
+      "RescheduleAppointmentRequest": {
+        "properties": {
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "startsAt",
+          "location"
+        ],
+        "title": "RescheduleAppointmentRequest"
+      },
+      "ScheduledAppointmentRequest": {
+        "properties": {
+          "chatId": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chatId",
+          "startsAt",
+          "location"
+        ],
+        "title": "ScheduledAppointmentRequest"
+      },
+      "ScheduledAppointmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "chatId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppointmentAPIStatus"
+          },
+          "durationMinutes": {
+            "type": "integer"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "chatId",
+          "status",
+          "durationMinutes",
+          "location"
+        ],
+        "title": "ScheduledAppointmentResponse"
+      },
+      "Scope": {
+        "type": "string",
+        "enum": [
+          "patients:read",
+          "patients:create",
+          "patients:update",
+          "addresses:read",
+          "addresses:update",
+          "pharmacies:search",
+          "pharmacies:set_preferred",
+          "coverage:update",
+          "chats:read",
+          "chats:create",
+          "chats:send_message",
+          "appointments:read",
+          "appointments:book",
+          "appointments:cancel",
+          "appointments:reschedule",
+          "artifacts:read"
+        ],
+        "title": "Scope"
+      },
+      "Sex": {
+        "type": "string",
+        "enum": [
+          "male",
+          "female"
+        ],
+        "title": "Sex"
+      },
+      "ShortSummaryArtifactResponse": {
+        "properties": {
+          "artifactType": {
+            "type": "string",
+            "const": "short_summary",
+            "default": "short_summary"
+          },
+          "artifactId": {
+            "type": "string"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ArtifactContent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifactId",
+          "content"
+        ],
+        "title": "ShortSummaryArtifactResponse"
+      },
+      "SoapNoteArtifactResponse": {
+        "properties": {
+          "artifactType": {
+            "type": "string",
+            "const": "soap_note",
+            "default": "soap_note"
+          },
+          "artifactId": {
+            "type": "string"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ArtifactContent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifactId",
+          "content"
+        ],
+        "title": "SoapNoteArtifactResponse"
+      },
+      "State": {
+        "type": "string",
+        "enum": [
+          "AK",
+          "AL",
+          "AR",
+          "AZ",
+          "CA",
+          "CO",
+          "CT",
+          "DC",
+          "DE",
+          "FL",
+          "GA",
+          "HI",
+          "IA",
+          "ID",
+          "IL",
+          "IN",
+          "KS",
+          "KY",
+          "LA",
+          "MA",
+          "MD",
+          "ME",
+          "MI",
+          "MN",
+          "MO",
+          "MS",
+          "MT",
+          "NC",
+          "ND",
+          "NE",
+          "NH",
+          "NJ",
+          "NM",
+          "NV",
+          "NY",
+          "OH",
+          "OK",
+          "OR",
+          "PA",
+          "RI",
+          "SC",
+          "SD",
+          "TN",
+          "TX",
+          "UT",
+          "VA",
+          "VT",
+          "WA",
+          "WI",
+          "WV",
+          "WY"
+        ],
+        "title": "State"
+      },
+      "StreamChatRequest": {
+        "properties": {
+          "userEvent": {
+            "$ref": "#/components/schemas/UserMessageEvent"
+          },
+          "timezone": {
+            "type": "string",
+            "default": "UTC"
+          }
+        },
+        "type": "object",
+        "required": [
+          "userEvent"
+        ],
+        "title": "StreamChatRequest"
+      },
+      "SuccessResponseForAddressResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AddressResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForAddressResponse"
+      },
+      "SuccessResponseForAppointmentResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AppointmentResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForAppointmentResponse"
+      },
+      "SuccessResponseForAppointmentResultResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AppointmentResultResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForAppointmentResultResponse"
+      },
+      "SuccessResponseForArtifactResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ArtifactResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForArtifactResponse"
+      },
+      "SuccessResponseForAsapAppointmentResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AsapAppointmentResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForAsapAppointmentResponse"
+      },
+      "SuccessResponseForAvailableSlotsResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AvailableSlotsResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForAvailableSlotsResponse"
+      },
+      "SuccessResponseForChatResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ChatResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForChatResponse"
+      },
+      "SuccessResponseForPage_AppointmentResponse_": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Page_AppointmentResponse_",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForPage[AppointmentResponse]"
+      },
+      "SuccessResponseForPage_ChatResponse_": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Page_ChatResponse_",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForPage[ChatResponse]"
+      },
+      "SuccessResponseForPage_MessageResponse_": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Page_MessageResponse_",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForPage[MessageResponse]"
+      },
+      "SuccessResponseForPharmacySearchResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PharmacySearchResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForPharmacySearchResponse"
+      },
+      "SuccessResponseForScheduledAppointmentResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ScheduledAppointmentResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForScheduledAppointmentResponse"
+      },
+      "SuccessResponseForUserCreatedResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserCreatedResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForUserCreatedResponse"
+      },
+      "SuccessResponse_AppointmentResultPendingResponse_": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "default": "Request successful"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppointmentResultPendingResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[AppointmentResultPendingResponse]"
+      },
+      "SuccessfulEmptyResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "type": "null",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "title": "SuccessfulEmptyResponse"
+      },
+      "UpdateUserRequest": {
+        "properties": {
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dateOfBirth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "description": "Patient date of birth"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ISO 8601 date"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "E.164 format, e.g. +15555550100. Required for appointment booking, not account creation. When carrier lookup is enabled, the configured line-type allowlist applies; normally mobile, fixed VoIP and non-fixed VoIP. Landlines are not supported by the default policy."
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sex assigned at birth, not gender"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "UpdateUserRequest",
+        "description": "Only explicitly supplied fields change; null clears a field."
+      },
+      "UserCreatedResponse": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dateOfBirth": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sex"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appointmentDemographicsComplete": {
+            "type": "boolean",
+            "description": "Required demographic fields are present. Not a booking authorization or phone-ownership check."
+          },
+          "missingAppointmentFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "description": "Missing firstName, lastName, dateOfBirth or phoneNumber. Address and chat readiness are separate."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "appointmentDemographicsComplete",
+          "missingAppointmentFields"
+        ],
+        "title": "UserCreatedResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "input": {},
+          "ctx": {
+            "type": "object"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidationErrorDetail": {
+        "type": "object",
+        "title": "ValidationErrorDetail",
+        "required": [
+          "field",
+          "message",
+          "code"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Request location and camel-case field path, separated by dots.",
+            "examples": [
+              "body.requiredField"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable explanation of the validation failure.",
+            "examples": [
+              "Field required"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable validation failure code.",
+            "examples": [
+              "error.validation.missing"
+            ]
+          }
+        }
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "title": "ValidationErrorResponse",
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "examples": [
+          {
+            "code": "error.validation_error",
+            "message": "Validation error",
+            "data": [
+              {
+                "field": "body.requiredField",
+                "message": "Field required",
+                "code": "error.validation.missing"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "error.validation_error",
+            "default": "error.validation_error",
+            "description": "Stable validation error code."
+          },
+          "message": {
+            "type": "string",
+            "const": "Validation error",
+            "default": "Validation error",
+            "description": "Human-readable error summary."
+          },
+          "data": {
+            "type": "array",
+            "description": "One entry for each request validation failure.",
+            "items": {
+              "$ref": "#/components/schemas/ValidationErrorDetail"
+            }
+          }
+        }
+      },
+      "UserMessageEvent": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "user_message",
+            "default": "user_message"
+          },
+          "userInput": {
+            "type": "string"
+          },
+          "messagePromptContext": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "userInput"
+        ],
+        "title": "UserMessageEvent"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "XDoctronicUserID": {
+        "type": "apiKey",
+        "description": "Doctronic user ID returned as `data.id` by `POST /users/`. This value identifies the user in your organization scope; it is not an API token.",
+        "in": "header",
+        "name": "X-Doctronic-User-ID"
+      }
+    },
+    "responses": {
+      "AuthenticationError": {
+        "description": "The organization Bearer token is missing, invalid, or inactive.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "UserScopeError": {
+        "description": "The authenticated organization cannot act on the selected user.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://partners.doctronic.ai/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "https://staging-partners.doctronic.ai/api/v1",
+      "description": "Staging"
+    }
+  ],
+  "tags": [
+    {
+      "name": "users",
+      "description": "Create and retrieve users in your organization."
+    },
+    {
+      "name": "chats",
+      "description": "Create conversations, send messages, and consume streaming clinical responses."
+    },
+    {
+      "name": "appointments",
+      "description": "Find availability and manage scheduled or ASAP appointments."
+    },
+    {
+      "name": "address",
+      "description": "Set the address used for care availability and fulfillment."
+    },
+    {
+      "name": "pharmacy",
+      "description": "Search for and select a user pharmacy."
+    },
+    {
+      "name": "artifacts",
+      "description": "Retrieve consultation summaries and clinical documents."
+    },
+    {
+      "name": "coverage",
+      "description": "Operations for coverage."
+    }
+  ]
+}

@@ -199,4 +199,8 @@ def test_sync_and_async_resources_match(
         sync_signature = inspect.signature(getattr(resource, name))
         async_signature = inspect.signature(getattr(twin, name))
         assert list(sync_signature.parameters) == list(async_signature.parameters), name
-        assert inspect.iscoroutinefunction(getattr(twin, name)), name
+        if (twin, name) == (AsyncChatsResource, "stream"):
+            # Returns an AsyncChatStreamManager: a coroutine that is also an async context manager.
+            assert async_signature.return_annotation == "AsyncChatStreamManager"
+        else:
+            assert inspect.iscoroutinefunction(getattr(twin, name)), name

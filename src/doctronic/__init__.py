@@ -21,14 +21,15 @@ from ._errors import (
     WebhookVerificationError,
 )
 from ._response import APIResponse
-from ._streaming import AsyncChatStream, ChatStream
+from ._streaming import AsyncChatStream, AsyncChatStreamManager, ChatStream
 from ._types import NOT_GIVEN, NotGiven
 from ._version import __version__
-from .webhooks import SIGNATURE_HEADER, verify_webhook
+from .webhooks import SIGNATURE_HEADER, WEBHOOK_SIGNATURE_HEADER, verify_webhook
 
 __all__ = [
     "NOT_GIVEN",
     "SIGNATURE_HEADER",
+    "WEBHOOK_SIGNATURE_HEADER",
     "APIConnectionError",
     "APIError",
     "APIResponse",
@@ -37,6 +38,7 @@ __all__ = [
     "APIUserAbortError",
     "ArtifactNotReadyError",
     "AsyncChatStream",
+    "AsyncChatStreamManager",
     "AsyncDoctronic",
     "AsyncUserScopedClient",
     "AuthenticationError",

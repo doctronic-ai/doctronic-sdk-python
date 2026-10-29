@@ -12,7 +12,7 @@ import contextlib
 import json
 import re
 import socket
-from collections.abc import AsyncGenerator, AsyncIterator, Generator, Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Coroutine, Generator, Iterator
 from dataclasses import dataclass, field
 from types import TracebackType
 from typing import Any, Literal, NamedTuple, TypeAlias, cast
@@ -27,6 +27,7 @@ from ._errors import APIConnectionError, APITimeoutError, APIUserAbortError, Doc
 __all__ = [
     "AiConsultationCompleteEvent",
     "AsyncChatStream",
+    "AsyncChatStreamManager",
     "ChatStream",
     "ChatStreamEvent",
     "ConsultationArtifacts",
@@ -502,3 +503,44 @@ class AsyncChatStream(_StreamBase):
         traceback: TracebackType | None,
     ) -> None:
         await self.close()
+
+
+class AsyncChatStreamManager(Coroutine[Any, Any, AsyncChatStream]):
+    """What `chats.stream()` returns on `AsyncDoctronic`: use it with `async with`, or await it.
+
+    `async with patient.chats.stream(...) as stream:` opens the stream and closes it when the
+    block ends. `stream = await patient.chats.stream(...)` opens it and leaves `close()` to you,
+    as in 0.1.0, and `async with await patient.chats.stream(...)` still works too. It's a
+    coroutine, so `asyncio.create_task()` and `asyncio.gather()` accept it as before.
+
+    Nothing is sent until you enter or await it.
+    """
+
+    def __init__(self, opening: Coroutine[Any, Any, AsyncChatStream]) -> None:
+        self._opening = opening
+        self._stream: AsyncChatStream | None = None
+
+    def __await__(self) -> Generator[Any, None, AsyncChatStream]:
+        return self._opening.__await__()
+
+    def send(self, value: Any) -> Any:
+        return self._opening.send(value)
+
+    def throw(self, *args: Any) -> Any:
+        return self._opening.throw(*args)
+
+    def close(self) -> None:
+        self._opening.close()
+
+    async def __aenter__(self) -> AsyncChatStream:
+        self._stream = await self._opening
+        return self._stream
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        if self._stream is not None:
+            await self._stream.close()

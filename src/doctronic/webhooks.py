@@ -21,6 +21,7 @@ from ._errors import WebhookVerificationError
 
 __all__ = [
     "SIGNATURE_HEADER",
+    "WEBHOOK_SIGNATURE_HEADER",
     "AppointmentCallEndedData",
     "AppointmentCallEndedEvent",
     "AppointmentPractitionerJoinedData",
@@ -35,7 +36,10 @@ __all__ = [
     "verify_webhook",
 ]
 
-SIGNATURE_HEADER = "X-Doctronic-Signature"
+WEBHOOK_SIGNATURE_HEADER = "X-Doctronic-Signature"
+"""The header that carries the signature. The TypeScript SDK exports the same name."""
+SIGNATURE_HEADER = WEBHOOK_SIGNATURE_HEADER
+"""The same header. Kept for code written against 0.1.0."""
 
 
 class _WebhookModel(BaseModel):
@@ -134,11 +138,13 @@ def verify_webhook(
     """Verify a delivery's signature, then parse it into a typed event.
 
     Pass the request body exactly as received, the `X-Doctronic-Signature` header value, and
-    your webhook secret. Raises `WebhookVerificationError` when the signature doesn't match or
-    the signed body isn't a valid event envelope.
+    your webhook secret. Raises `WebhookVerificationError` when the secret is empty, the
+    signature doesn't match, or the signed body isn't a valid event envelope.
     """
-    if not secret:
-        raise ValueError("The webhook secret is empty.")
+    if not isinstance(secret, str) or not secret:
+        # An unset secret must fail like a bad signature, so a handler that answers
+        # `WebhookVerificationError` with 400 can't accept forged deliveries.
+        raise WebhookVerificationError("A webhook secret is required.")
     body = raw_body.encode("utf-8") if isinstance(raw_body, str) else bytes(raw_body)
     expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
     # Compare bytes: `compare_digest` rejects non-ASCII str, and the header is attacker input.

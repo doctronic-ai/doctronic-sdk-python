@@ -31,7 +31,7 @@ AnyClient = Doctronic | AsyncDoctronic
     [
         (400, "error.user.conflict", BadRequestError),
         (401, "error.auth.unauthorized", AuthenticationError),
-        (403, "error.member.forbidden", PermissionDeniedError),
+        (403, "error.auth.insufficient_scope", PermissionDeniedError),
         (404, "error.address.not_found", NotFoundError),
         (409, "error.appointments.cannot_be_cancelled_or_rescheduled", ConflictError),
         (422, "error.unknown", BadRequestError),
@@ -135,16 +135,26 @@ async def test_error_without_json_body(client: AnyClient, api: respx.MockRouter)
 
 
 @pytest.mark.asyncio
-async def test_response_that_breaks_the_contract(client: AnyClient, api: respx.MockRouter) -> None:
-    api.get("/users/").mock(return_value=httpx.Response(200, json={"data": {"id": 7}}))
-    api.get("/address/").mock(return_value=httpx.Response(200, text="not json"))
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(200, text="not json"),
+        httpx.Response(200, json=["not", "an", "envelope"]),
+        httpx.Response(200, json={"code": "success", "message": "Request successful"}),
+        httpx.Response(200, json={"code": "success", "data": None}),
+    ],
+    ids=["not-json", "not-an-object", "no-data", "null-data"],
+)
+async def test_response_without_data_breaks_the_contract(
+    client: AnyClient, api: respx.MockRouter, response: httpx.Response
+) -> None:
+    api.get("/users/").mock(return_value=response)
 
     with pytest.raises(APIResponseValidationError) as raised:
         await resolve(client.for_user(USER_ID).users.retrieve())
-    with pytest.raises(APIResponseValidationError):
-        await resolve(client.for_user(USER_ID).address.retrieve())
 
     assert raised.value.status == 200
+    assert isinstance(raised.value, APIError)
 
 
 @pytest.mark.asyncio

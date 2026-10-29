@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
@@ -25,7 +26,17 @@ from doctronic._base_client import RequestOptions
 from doctronic._generated.operations import OPERATIONS, Operation
 from doctronic._response import parse_empty
 from tests.conftest import FakeClock
-from tests.helpers import BASE_URL, TOKEN, USER_ID, ChunkedStream, error, ok, resolve
+from tests.helpers import (
+    BASE_URL,
+    TOKEN,
+    USER_ID,
+    ChunkedStream,
+    error,
+    ok,
+    pinned_contract,
+    resolve,
+)
+from tests.test_codegen import CONCURRENT, PAYLOAD_MISMATCH, facts, with_retryable_codes
 
 AnyClient = Doctronic | AsyncDoctronic
 
@@ -182,6 +193,51 @@ async def test_state_conflict_409_is_not_retried(client: AnyClient, api: respx.M
 
     assert raised.value.code == SLOT_TAKEN
     assert route.call_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("code", "attempts"),
+    [
+        (CONCURRENT, 2),  # Listed in x-doctronic-retryable-codes.
+        (PAYLOAD_MISMATCH, 1),  # Documented, not listed: final.
+        (SLOT_TAKEN, 1),  # Documented, not listed: final.
+        ("error.idempotency.something_new", 2),  # Undocumented: an idempotency conflict.
+        (None, 2),
+    ],
+)
+async def test_409_codes_follow_the_retryable_codes_extension(
+    client: AnyClient,
+    api: respx.MockRouter,
+    monkeypatch: pytest.MonkeyPatch,
+    code: str | None,
+    attempts: int,
+) -> None:
+    key = ("POST", "/appointments/scheduled/")
+    generated = facts(with_retryable_codes(pinned_contract(), extension=[CONCURRENT]))[key]
+    monkeypatch.setitem(
+        OPERATIONS,
+        key,
+        dataclasses.replace(OPERATIONS[key], conflict_codes=frozenset(generated["conflict_codes"])),
+    )
+    route = api.post("/appointments/scheduled/").mock(
+        side_effect=[error(409, code), ok(SCHEDULED, 201)]
+    )
+
+    def book() -> object:
+        return client.for_user(USER_ID).appointments.create_scheduled(
+            chat_id="chat_01", starts_at="2026-09-01T15:00:00Z", location={"state": "NY"}
+        )
+
+    if attempts == 2:
+        await resolve(book())
+    else:
+        with pytest.raises(ConflictError) as raised:
+            await resolve(book())
+        assert raised.value.code == code
+
+    assert route.call_count == attempts
+    assert len({call.request.headers["idempotency-key"] for call in route.calls}) == 1
 
 
 @pytest.mark.asyncio

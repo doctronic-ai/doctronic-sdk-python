@@ -1,0 +1,119 @@
+# Reports when openapi/doctronic-v1.json, the pinned copy of the contract the SDK is generated
+# from, differs from the contract the docs publish. It never commits or opens a pull request:
+# regenerate.yml does that. It isn't a required check, and it doesn't run on pull requests, so a
+# new published contract never blocks unrelated work.
+
+name: Contract drift
+
+on:
+  schedule:
+    # Daily at 14:29 UTC, after the docs' daily API sync. The odd minute avoids the busiest
+    # times in the Actions queue.
+    - cron: "29 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-drift
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.11.19"
+  PUBLIC_CONTRACT_URL: https://docs.doctronic.ai/openapi/doctronic-v1.json
+
+jobs:
+  drift:
+    name: Pinned contract matches the published contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Fetch the published contract
+        run: |
+          curl --fail --silent --show-error --location --max-time 60 --retry 3 \
+            --header 'accept: application/json' --header 'cache-control: no-cache' \
+            --output "$RUNNER_TEMP/published.json" "$PUBLIC_CONTRACT_URL"
+
+      - name: Compare it with the pinned copy
+        id: compare
+        run: |
+          uv run python scripts/contract_changes.py openapi/doctronic-v1.json \
+            "$RUNNER_TEMP/published.json" --outputs "$GITHUB_OUTPUT" > "$RUNNER_TEMP/changes.md"
+
+      # A contract that breaks the generator is still reported below, with the failure.
+      - name: Regenerate from the published contract
+        id: regenerate
+        if: steps.compare.outputs.changed == 'true'
+        continue-on-error: true
+        # An explicit bash shell adds pipefail, so the step fails when the generator fails.
+        shell: bash
+        run: |
+          uv run python scripts/generate.py --contract "$RUNNER_TEMP/published.json" 2>&1 \
+            | tee "$RUNNER_TEMP/generate.log"
+          git diff --stat -- src/doctronic/_generated > "$RUNNER_TEMP/generated.txt"
+
+      - name: Report
+        if: always()
+        env:
+          COMPARE: ${{ steps.compare.outcome }}
+          CHANGED: ${{ steps.compare.outputs.changed }}
+          REGENERATE: ${{ steps.regenerate.outcome }}
+          PINNED_SHA256: ${{ steps.compare.outputs.old-sha256 }}
+          PUBLISHED_SHA256: ${{ steps.compare.outputs.new-sha256 }}
+        run: |
+          {
+            echo "## Contract drift"
+            echo
+            if [ "$COMPARE" != "success" ]; then
+              echo "Couldn't compare the pinned \`openapi/doctronic-v1.json\` with $PUBLIC_CONTRACT_URL. The failing step's log has the reason."
+            elif [ "$CHANGED" != "true" ]; then
+              echo "The pinned \`openapi/doctronic-v1.json\` matches $PUBLIC_CONTRACT_URL (sha256 \`$PINNED_SHA256\`)."
+            else
+              echo "The pinned \`openapi/doctronic-v1.json\` (sha256 \`$PINNED_SHA256\`) differs from $PUBLIC_CONTRACT_URL (sha256 \`$PUBLISHED_SHA256\`). Merge the \`regenerate.yml\` pull request, or run that workflow to open one."
+              echo
+              cat "$RUNNER_TEMP/changes.md"
+              echo
+              echo "### Generated code"
+              echo
+              if [ "$REGENERATE" != "success" ]; then
+                echo "Regenerating from the published contract failed, so the SDK can't take this contract as it is. The end of the generator's log:"
+                echo
+                echo '```'
+                tail -n 40 "$RUNNER_TEMP/generate.log" 2>/dev/null || true
+                echo '```'
+              elif [ -s "$RUNNER_TEMP/generated.txt" ]; then
+                echo '```'
+                cat "$RUNNER_TEMP/generated.txt"
+                echo '```'
+              else
+                echo "Regenerating from the published contract doesn't change \`src/doctronic/_generated\`."
+              fi
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$COMPARE" != "success" ]; then
+            echo "::error::Couldn't compare the pinned contract with $PUBLIC_CONTRACT_URL."
+            exit 1
+          fi
+          if [ "$REGENERATE" = "failure" ]; then
+            echo "::error::openapi/doctronic-v1.json is behind $PUBLIC_CONTRACT_URL, and the published contract doesn't regenerate. The run summary has the details."
+            exit 1
+          fi
+          if [ "$CHANGED" = "true" ]; then
+            echo "::error::openapi/doctronic-v1.json is behind $PUBLIC_CONTRACT_URL. The run summary lists the changes."
+            exit 1
+          fi

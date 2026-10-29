@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from contextvars import ContextVar
 from datetime import date, datetime
@@ -10,12 +11,15 @@ from typing import Any, Generic, ParamSpec, TypeVar, cast
 import httpx
 import pydantic
 
+from ._construct import construct
 from ._errors import APIResponseValidationError
 from ._types import NotGiven
 
 T = TypeVar("T")
 P = ParamSpec("P")
 M = TypeVar("M", bound=pydantic.BaseModel)
+
+log = logging.getLogger("doctronic")
 
 # Set while a `with_raw_response` wrapper runs, so the request returns an `APIResponse`.
 _raw_response: ContextVar[bool] = ContextVar("doctronic_raw_response", default=False)
@@ -101,34 +105,58 @@ def _envelope_data(response: httpx.Response) -> Any:
         raise APIResponseValidationError(
             "The response body isn't JSON.", status=response.status_code, headers=response.headers
         ) from exc
-    if not isinstance(body, dict) or "data" not in body:
+    if not isinstance(body, dict) or body.get("data") is None:
         raise APIResponseValidationError(
-            "The response body isn't a success envelope.",
+            "The response is missing `data`.",
             status=response.status_code,
             headers=response.headers,
         )
     return body["data"]
 
 
-def parse_data(adapter: pydantic.TypeAdapter[T]) -> Callable[[httpx.Response], T]:
-    """Unwrap the `{code, message, data}` envelope and validate `data`."""
+def _summarize(exc: pydantic.ValidationError) -> str:
+    """Where and how the data differs from the contract, without the values, which can be PHI."""
+    errors = exc.errors(include_url=False, include_context=False, include_input=False)
+    parts = [
+        f"{'.'.join(str(part) for part in error['loc']) or '(root)'} ({error['type']})"
+        for error in errors[:10]
+    ]
+    if len(errors) > 10:
+        parts.append(f"and {len(errors) - 10} more")
+    return ", ".join(parts)
 
-    def parse(response: httpx.Response) -> T:
+
+def parse_data(annotation: Any) -> Callable[[httpx.Response], Any]:
+    """Unwrap the `{code, message, data}` envelope and validate `data` against `annotation`.
+
+    Only a missing `data` raises. Data that doesn't match the contract, such as a missing field
+    or a value of another type, is still returned, built by `_construct.construct()`, and logged
+    as a warning on the `doctronic` logger. Unknown enum values and fields the contract doesn't
+    list validate normally.
+    """
+    adapter: pydantic.TypeAdapter[Any] = pydantic.TypeAdapter(annotation)
+    name = getattr(annotation, "__name__", repr(annotation))
+
+    def parse(response: httpx.Response) -> Any:
         data = _envelope_data(response)
         try:
             return adapter.validate_python(data)
         except pydantic.ValidationError as exc:
-            raise APIResponseValidationError(
-                f"The response data doesn't match the contract: {exc}",
-                status=response.status_code,
-                headers=response.headers,
-            ) from exc
+            log.warning(
+                "%s data (request ID %s) doesn't match the contract at %s. Those fields are "
+                "returned as the API sent them, and missing ones are None.",
+                name,
+                response.headers.get("x-request-id", "unknown"),
+                _summarize(exc),
+            )
+            return construct(annotation, data)
 
     return parse
 
 
 def parse_model(model: type[M]) -> Callable[[httpx.Response], M]:
-    return parse_data(pydantic.TypeAdapter(model))
+    parse: Callable[[httpx.Response], M] = parse_data(model)
+    return parse
 
 
 def parse_empty(response: httpx.Response) -> None:

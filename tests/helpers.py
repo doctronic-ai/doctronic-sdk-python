@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import importlib.util
 import inspect
+import json
+import sys
 from collections.abc import AsyncIterator, Awaitable, Iterator
 from pathlib import Path
+from types import ModuleType
 from typing import Any, TypeVar
 
 import httpx
@@ -16,6 +20,30 @@ BASE_URL = "https://api.test/api/v1"
 TOKEN = "test-token-not-a-real-credential"
 USER_ID = "mem_test_user"
 FIXTURES = Path(__file__).parent / "fixtures"
+ROOT = Path(__file__).parent.parent
+PINNED_CONTRACT = ROOT / "openapi" / "doctronic-v1.json"
+
+
+def load_script(name: str) -> ModuleType:
+    """`scripts/<name>.py` as a module, importable by the other scripts under that name."""
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}.py")
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_generator() -> ModuleType:
+    return load_script("generate")
+
+
+def pinned_contract() -> dict[str, Any]:
+    contract: dict[str, Any] = json.loads(PINNED_CONTRACT.read_text(encoding="utf-8"))
+    return contract
 
 
 async def resolve(value: Awaitable[T] | T) -> T:

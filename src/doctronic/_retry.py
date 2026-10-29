@@ -7,9 +7,13 @@ Each rule reads the facts the contract declares about the operation (`_generated
 - Only reads (`GET`) and the operations whose contract declares an `Idempotency-Key` header are
   retried. Every other mutation is sent once.
 - Network errors, timeouts, `429`, and `503` are retried.
-- `409` is retried on idempotent operations only, and only when its `code` isn't one of the
-  state conflicts the contract documents for that operation: the remaining `409`s are
-  idempotency conflicts, where the first request with the key is still in progress.
+- `409` is retried on idempotent operations only, and only when its `code` isn't a final one
+  for that operation (`Operation.conflict_codes`). The final codes are the ones the contract's
+  409 examples document, such as `error.appointments.slot_unavailable`, minus any the 409
+  response lists in `x-doctronic-retryable-codes`, such as an idempotency conflict whose first
+  request is still in progress. Without that list, every documented code is final. A `409`
+  without a code, or with one the contract doesn't document, is treated as an idempotency
+  conflict and retried with the same key.
 - Other `5xx` are retried on reads only, unless the contract documents that status for the
   operation as a definitive result, like `500` for an artifact whose generation failed.
 - Delays grow exponentially with jitter. A `Retry-After` replaces the backoff.
