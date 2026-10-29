@@ -41,6 +41,14 @@ def _summary(contract: dict[str, Any], key: Key) -> str:
     return f"- `{method} {path}`" + (f": {summary}" if summary else "")
 
 
+def _changed_facts(before: dict[str, Any], after: dict[str, Any]) -> str:
+    return "; ".join(
+        f"`{field}` {json.dumps(before.get(field))} to {json.dumps(after.get(field))}"
+        for field in sorted(before.keys() | after.keys())
+        if field not in ("method", "path") and before.get(field) != after.get(field)
+    )
+
+
 def report(old: dict[str, Any], new: dict[str, Any]) -> tuple[list[str], dict[str, int]]:
     before, after = _operations(old), _operations(new)
     added = sorted(after.keys() - before.keys())
@@ -56,15 +64,26 @@ def report(old: dict[str, Any], new: dict[str, Any]) -> tuple[list[str], dict[st
         else f"Contract version: `{new_version}` (unchanged).",
         "",
     ]
-    sections = [
-        ("New operations", added, new),
-        ("Removed operations", removed, old),
-        ("Operations whose retry, idempotency, or response facts changed", modified, new),
-        ("New operations the SDK skips (no organization `HTTPBearer` security)", skipped, new),
-    ]
-    for title, keys, contract in sections:
-        if keys:
-            lines += [f"### {title}", "", *(_summary(contract, key) for key in keys), ""]
+    if added:
+        lines += ["### New operations", "", *(_summary(new, key) for key in added), ""]
+        lines += [
+            "Their models and runtime facts are generated. Each needs a hand-written resource "
+            "method in `src/doctronic/resources/` and an entry in `RESOURCES` in "
+            "`tests/test_models.py`; the tests fail until then.",
+            "",
+        ]
+    if removed:
+        lines += ["### Removed operations", "", *(_summary(old, key) for key in removed), ""]
+        lines += ["Remove their resource methods; the tests fail until then.", ""]
+    if modified:
+        lines += ["### Operations whose runtime facts changed", ""]
+        lines += [
+            f"{_summary(new, key)}. {_changed_facts(before[key], after[key])}" for key in modified
+        ]
+        lines += [""]
+    if skipped:
+        lines += ["### New operations the SDK skips (no organization `HTTPBearer` security)", ""]
+        lines += [*(_summary(new, key) for key in skipped), ""]
     if not (added or removed or modified or skipped):
         lines += ["No operations were added, removed, or changed.", ""]
     counts = {"added": len(added), "removed": len(removed), "modified": len(modified)}

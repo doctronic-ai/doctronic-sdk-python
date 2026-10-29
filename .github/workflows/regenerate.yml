@@ -1,0 +1,425 @@
+# Updates the pinned contract (openapi/doctronic-v1.json) from the published one, regenerates
+# src/doctronic/_generated/, runs the checks, and opens or updates a pull request with the result.
+#
+# The `regenerate` job runs uv and the repository's code with read-only access. Only the
+# `pull-request` job can write, and it runs no repository code: it applies the regenerated files
+# and opens the pull request as the doctronic-docs-sync GitHub App, so the commits are signed and
+# the pull request triggers the required checks. Without the app's secrets, or when the app can't
+# mint a token for this repository, the run skips the pull request with a notice.
+#
+# The TypeScript SDK's regenerate.yml works the same way.
+
+name: Regenerate from the API contract
+
+on:
+  # The developer docs send this after they publish a new contract, with the client_payload
+  # {contract_url, sha256, docs_sha, changelog_url, breaking, run_url}.
+  repository_dispatch:
+    types: [contract-published]
+  schedule:
+    # Daily at 14:23 UTC, as a fallback for a missed dispatch. The odd minute avoids the busiest
+    # times on the Actions queue.
+    - cron: "23 14 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+# One run at a time, start to finish, so an older run can't overwrite a newer run's pull request. A
+# run that arrives while another waits replaces the waiting one, so the newest contract wins.
+concurrency:
+  group: regenerate
+  cancel-in-progress: false
+
+env:
+  UV_VERSION: "0.13.0"
+  CONTRACT_URL: https://docs.doctronic.ai/openapi/doctronic-v1.json
+  SYNC_BRANCH: automation/regenerate
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  # The dispatch payload is untrusted input: it reaches the shell only through env, and leaves this
+  # job only after an exact-match or pattern check.
+  route:
+    name: Read the trigger
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      sha256: ${{ steps.validate.outputs.sha256 }}
+      docs-sha: ${{ steps.validate.outputs.docs-sha }}
+      changelog-url: ${{ steps.validate.outputs.changelog-url }}
+      breaking: ${{ steps.validate.outputs.breaking }}
+      docs-run-url: ${{ steps.validate.outputs.docs-run-url }}
+    steps:
+      - name: Validate the dispatch payload
+        id: validate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PAYLOAD_CONTRACT_URL: ${{ github.event.client_payload.contract_url }}
+          PAYLOAD_SHA256: ${{ github.event.client_payload.sha256 }}
+          PAYLOAD_DOCS_SHA: ${{ github.event.client_payload.docs_sha }}
+          PAYLOAD_CHANGELOG_URL: ${{ github.event.client_payload.changelog_url }}
+          PAYLOAD_BREAKING: ${{ github.event.client_payload.breaking }}
+          PAYLOAD_RUN_URL: ${{ github.event.client_payload.run_url }}
+        shell: bash
+        run: |
+          sha256=""
+          docs_sha=""
+          changelog_url=""
+          breaking=false
+          docs_run_url=""
+          if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+            invalid=0
+            # Required: the contract this run fetches, and the hash it must have.
+            if [ "$PAYLOAD_CONTRACT_URL" != "$CONTRACT_URL" ]; then
+              echo "::error::client_payload.contract_url must be $CONTRACT_URL."
+              invalid=1
+            fi
+            if [[ "$PAYLOAD_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+              sha256="$PAYLOAD_SHA256"
+            else
+              echo "::error::client_payload.sha256 must be 64 lowercase hex characters."
+              invalid=1
+            fi
+            case "$PAYLOAD_BREAKING" in
+              true) breaking=true ;;
+              false | "") ;;
+              *)
+                echo "::error::client_payload.breaking must be true or false."
+                invalid=1
+                ;;
+            esac
+            if [ "$invalid" = 1 ]; then exit 1; fi
+
+            # Optional: links for the pull request body. A malformed one is dropped.
+            if [[ "$PAYLOAD_DOCS_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+              docs_sha="$PAYLOAD_DOCS_SHA"
+            elif [ -n "$PAYLOAD_DOCS_SHA" ]; then
+              echo "::warning::Ignored client_payload.docs_sha: not a commit SHA."
+            fi
+            if [[ "$PAYLOAD_CHANGELOG_URL" =~ ^https://docs\.doctronic\.ai/[A-Za-z0-9._~/#-]*$ ]]; then
+              changelog_url="$PAYLOAD_CHANGELOG_URL"
+            elif [ -n "$PAYLOAD_CHANGELOG_URL" ]; then
+              echo "::warning::Ignored client_payload.changelog_url: not a docs.doctronic.ai URL."
+            fi
+            if [[ "$PAYLOAD_RUN_URL" =~ ^https://github\.com/doctronic-ai/[A-Za-z0-9._-]+/actions/runs/[0-9]+(/attempts/[0-9]+)?$ ]]; then
+              docs_run_url="$PAYLOAD_RUN_URL"
+            elif [ -n "$PAYLOAD_RUN_URL" ]; then
+              echo "::warning::Ignored client_payload.run_url: not a doctronic-ai Actions run URL."
+            fi
+          fi
+          {
+            echo "sha256=$sha256"
+            echo "docs-sha=$docs_sha"
+            echo "changelog-url=$changelog_url"
+            echo "breaking=$breaking"
+            echo "docs-run-url=$docs_run_url"
+          } >> "$GITHUB_OUTPUT"
+
+  regenerate:
+    name: Regenerate and check
+    needs: route
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+      checks: ${{ steps.checks.outcome }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Keep the previous contract
+        run: cp openapi/doctronic-v1.json "$RUNNER_TEMP/previous.json"
+
+      # The docs CDN can serve the previous contract for a while after a publish, so a dispatched
+      # run fetches until the hash matches. The schedule and manual runs take what's published.
+      - name: Fetch the published contract
+        env:
+          SHA256: ${{ needs.route.outputs.sha256 }}
+        shell: bash
+        run: |
+          url="$CONTRACT_URL"
+          if [ -n "$SHA256" ]; then url="$CONTRACT_URL?sha256=$SHA256"; fi
+          attempts=20
+          for attempt in $(seq 1 "$attempts"); do
+            if curl --fail --silent --show-error --max-time 60 \
+              --header 'accept: application/json' --header 'cache-control: no-cache' \
+              --output "$RUNNER_TEMP/published.json" "$url"; then
+              actual="$(sha256sum "$RUNNER_TEMP/published.json" | cut -d' ' -f1)"
+              if [ -z "$SHA256" ] || [ "$actual" = "$SHA256" ]; then
+                echo "Fetched the contract on attempt $attempt (sha256 $actual)."
+                cp "$RUNNER_TEMP/published.json" openapi/doctronic-v1.json
+                exit 0
+              fi
+              echo "Attempt $attempt of $attempts: got sha256 $actual, expected $SHA256."
+            else
+              echo "Attempt $attempt of $attempts: the request failed."
+            fi
+            if [ "$attempt" -lt "$attempts" ]; then sleep 30; fi
+          done
+          if [ -n "$SHA256" ]; then
+            echo "::error::The published contract never matched sha256 $SHA256 in $attempts attempts."
+          else
+            echo "::error::Couldn't fetch $CONTRACT_URL in $attempts attempts."
+          fi
+          exit 1
+
+      - name: Regenerate
+        run: uv run python scripts/generate.py
+
+      - name: Report operation changes
+        shell: bash
+        run: |
+          uv run python scripts/contract_changes.py "$RUNNER_TEMP/previous.json" \
+            openapi/doctronic-v1.json | tee "$RUNNER_TEMP/operations.md"
+
+      # A failing check must not hide the contract change, so the pull request is still opened,
+      # with the log. The required checks keep it from merging.
+      - name: Lint, type check, test, and build
+        id: checks
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            uv run ruff check . &&
+            uv run ruff format --check . &&
+            uv run mypy &&
+            uv run pytest &&
+            uv build --out-dir "$RUNNER_TEMP/dist"
+          } 2>&1 | tee "$RUNNER_TEMP/checks.log"
+
+      - name: Look for changes
+        id: changes
+        run: |
+          if [ -z "$(git status --porcelain -- openapi src/doctronic/_generated)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes: openapi/doctronic-v1.json already matches the published contract." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git status --short -- openapi src/doctronic/_generated
+          fi
+
+      - name: Write the pull request body
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          CHECKS: ${{ steps.checks.outcome }}
+          DOCS_SHA: ${{ needs.route.outputs.docs-sha }}
+          CHANGELOG_URL: ${{ needs.route.outputs.changelog-url }}
+          DOCS_RUN_URL: ${{ needs.route.outputs.docs-run-url }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/regenerated/files"
+          actual="$(sha256sum openapi/doctronic-v1.json | cut -d' ' -f1)"
+          {
+            echo "This automated pull request updates \`openapi/doctronic-v1.json\` to the contract published at $CONTRACT_URL (sha256 \`$actual\`) and regenerates \`src/doctronic/_generated/\`. It changes nothing else."
+            echo
+            case "$EVENT_NAME" in
+              repository_dispatch)
+                trigger="the docs publish"
+                if [ -n "$DOCS_SHA" ]; then trigger="$trigger at \`$DOCS_SHA\`"; fi
+                if [ -n "$DOCS_RUN_URL" ]; then trigger="$trigger ([docs run]($DOCS_RUN_URL))"; fi
+                ;;
+              schedule) trigger="the daily schedule" ;;
+              *) trigger="a manual run" ;;
+            esac
+            echo "Triggered by $trigger. [Regenerate run]($RUN_URL)."
+            if [ -n "$CHANGELOG_URL" ]; then echo "API changelog: $CHANGELOG_URL"; fi
+            echo
+            if [ "$CHECKS" = "success" ]; then
+              echo "Lint, type check, tests, and build passed in the [regenerate run]($RUN_URL)."
+            else
+              echo "> [!WARNING]"
+              echo "> Lint, type check, tests, or build failed in the [regenerate run]($RUN_URL). Fix the SDK before merging. The end of the log is below."
+            fi
+            echo
+            echo "## Operations"
+            echo
+            cat "$RUNNER_TEMP/operations.md"
+            echo
+            echo "This branch is rebuilt on every run, so don't push to it. Add resource methods for new operations in a follow-up pull request."
+            if [ "$CHECKS" != "success" ]; then
+              echo
+              echo "<details>"
+              echo "<summary>Check log (last 80 lines)</summary>"
+              echo
+              echo '```'
+              tail -n 80 "$RUNNER_TEMP/checks.log"
+              echo '```'
+              echo "</details>"
+            fi
+          } > "$RUNNER_TEMP/regenerated/pull-request-body.md"
+          cp -R --parents openapi/doctronic-v1.json src/doctronic/_generated "$RUNNER_TEMP/regenerated/files/"
+
+      - name: Upload the regenerated files
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: regenerated
+          path: ${{ runner.temp }}/regenerated
+          if-no-files-found: error
+          retention-days: 3
+
+  pull-request:
+    name: Open or update the pull request
+    needs: [route, regenerate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # GITHUB_TOKEN labels the pull request; adding a label the repository doesn't have creates it,
+    # which needs issues access. The app token writes the branch and opens the pull request.
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # GITHUB_TOKEN can't stand in: pull requests it opens don't trigger the required checks, and
+      # main only accepts signed commits.
+      - name: Check for the docs sync app secrets
+        id: secrets
+        env:
+          APP_ID: ${{ secrets.DOCS_SYNC_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.DOCS_SYNC_APP_PRIVATE_KEY }}
+        run: |
+          if [ -n "$APP_ID" ] && [ -n "$APP_PRIVATE_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipped the pull request: the DOCS_SYNC_APP_ID and DOCS_SYNC_APP_PRIVATE_KEY secrets aren't available to this repository."
+          fi
+
+      # Minted just before use, for this repository only, with what create-pull-request needs to
+      # commit through the API and open the pull request.
+      - name: Create the docs sync app token
+        id: app-token
+        if: steps.secrets.outputs.available == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          # The secret holds the numeric app ID, which this input accepts like the deprecated app-id.
+          client-id: ${{ secrets.DOCS_SYNC_APP_ID }}
+          private-key: ${{ secrets.DOCS_SYNC_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: doctronic-sdk-python
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Skip without a token
+        id: token
+        env:
+          AVAILABLE: ${{ steps.secrets.outputs.available }}
+          MINTED: ${{ steps.app-token.outcome }}
+        run: |
+          if [ "$MINTED" = "success" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "Minted a doctronic-docs-sync app token for this repository." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            if [ "$AVAILABLE" = "true" ]; then
+              echo "::notice::Skipped the pull request: the doctronic-docs-sync app couldn't mint a token for this repository. Install the app on doctronic-sdk-python with contents and pull requests write access."
+            fi
+            echo "Skipped the pull request: no app token. The regenerated files are in the regenerate job's artifact when anything changed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # This job runs no repository code, so the checkout keeps its credentials, as
+      # create-pull-request expects. It swaps in the app token for its own git operations.
+      - name: Checkout
+        if: steps.token.outputs.ok == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download the regenerated files
+        if: steps.token.outputs.ok == 'true' && needs.regenerate.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: regenerated
+          path: ${{ runner.temp }}/regenerated
+
+      # The artifact holds the whole generated directory, so a file the generator no longer writes
+      # is removed too.
+      - name: Apply the regenerated files
+        if: steps.token.outputs.ok == 'true' && needs.regenerate.outputs.changed == 'true'
+        run: |
+          rm -rf src/doctronic/_generated
+          cp -R "$RUNNER_TEMP/regenerated/files/." .
+
+      - name: Report no changes
+        if: steps.token.outputs.ok == 'true' && needs.regenerate.outputs.changed != 'true'
+        run: |
+          echo "::notice::No changes: openapi/doctronic-v1.json already matches the published contract, so there's no pull request to open."
+          echo "No changes: no pull request opened. An open pull request from $SYNC_BRANCH, if any, is closed." >> "$GITHUB_STEP_SUMMARY"
+          # create-pull-request still runs, to close a stale pull request, and reads a body file.
+          mkdir -p "$RUNNER_TEMP/regenerated"
+          echo "No changes." > "$RUNNER_TEMP/regenerated/pull-request-body.md"
+
+      # The branch holds every contract change not yet on main, so a breaking change stays flagged
+      # until the pull request merges, or someone removes the label by hand.
+      - name: Decide whether the pull request is breaking
+        id: breaking
+        if: steps.token.outputs.ok == 'true' && needs.regenerate.outputs.changed == 'true'
+        env:
+          BREAKING: ${{ needs.route.outputs.breaking }}
+        run: |
+          labeled="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$SYNC_BRANCH" --base main --state open \
+            --json labels --jq '[.[].labels[].name] | any(. == "breaking-change")')"
+          if [ "$BREAKING" = "true" ] || [ "$labeled" = "true" ]; then
+            echo "breaking=true" >> "$GITHUB_OUTPUT"
+            body="$RUNNER_TEMP/regenerated/pull-request-body.md"
+            {
+              echo "> [!CAUTION]"
+              echo "> The docs flagged a contract change on this branch as breaking, so this pull request is labeled \`breaking-change\`. Check the SDK's public types and methods, and plan a minor release. Remove the label if it no longer applies."
+              echo
+              cat "$body"
+            } > "$body.new"
+            mv "$body.new" "$body"
+          else
+            echo "breaking=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Signed commits are created through the API as the app, so GitHub verifies them, and the
+      # app's push and pull request trigger the required checks. With no changes, this deletes the
+      # branch, which closes a pull request left open on it.
+      - name: Open or update the pull request
+        id: pull-request
+        if: steps.token.outputs.ok == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          sign-commits: true
+          branch: ${{ env.SYNC_BRANCH }}
+          base: main
+          delete-branch: true
+          commit-message: "feat(api): update the pinned contract and regenerate"
+          title: "feat(api): update the pinned contract and regenerate"
+          body-path: ${{ runner.temp }}/regenerated/pull-request-body.md
+          add-paths: |
+            openapi/doctronic-v1.json
+            src/doctronic/_generated/**
+
+      # Only ever added here. The previous step carries it over from the open pull request.
+      - name: Label a breaking change
+        if: steps.breaking.outputs.breaking == 'true' && steps.pull-request.outputs.pull-request-number != ''
+        env:
+          PULL_REQUEST_NUMBER: ${{ steps.pull-request.outputs.pull-request-number }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/labels" \
+            --field 'labels[]=breaking-change' --silent
+
+      - name: Fail the run when the checks failed
+        if: needs.regenerate.outputs.checks == 'failure'
+        run: |
+          echo "::error::Lint, type check, tests, or build failed on the regenerated code. See the regenerate job."
+          exit 1
