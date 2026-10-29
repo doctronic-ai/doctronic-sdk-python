@@ -1,5 +1,10 @@
-# Version updates wait 14 days after a release, so every dependency is at least two weeks old.
-# The cooldown doesn't apply to security updates.
+# Version updates wait 14 days after a release (the cooldowns below), so every dependency is at
+# least two weeks old.
+#
+# Dependabot skips the cooldown for security updates, but for uv that isn't enough: uv applies
+# its own two-week floor (`exclude-newer = "14 days"` in pyproject.toml) to every resolution,
+# security updates included. A fix released less than two weeks ago doesn't resolve until the
+# package gets an `exclude-newer-package` entry in pyproject.toml. CONTRIBUTING.md has the steps.
 version: 2
 updates:
   - package-ecosystem: uv
