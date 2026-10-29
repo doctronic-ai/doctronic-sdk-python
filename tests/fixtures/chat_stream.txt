@@ -1,0 +1,48 @@
+: connected
+
+event: message.start
+data: {"type":"message.start","role":"assistant","messageId":"ac_hist_01","messageTimestamp":1741856873000}
+
+event: message.content
+data: {"type":"message.content","messageId":"ac_hist_01","content":"I can help with that. "}
+
+event: message.start
+data: {"type":"message.start","role":"assistant","messageId":"ac_hist_02"}
+
+event: guardian
+data: {"type":"guardian","guardianId":"emergency_breathing","message":"Please call emergency services now."}
+
+id: 7
+event: message.content
+data: {"type":"message.content",
+data: "messageId":"ac_hist_01","content":"A fever of 101.5 °F — let’s look at it."}
+
+event: message.content
+data: {"type":"message.content","messageId":"ac_hist_02","content":"Second message."}
+
+event: message.stop
+data: {"type":"message.stop","messageId":"ac_hist_01"}
+
+: keep-alive
+event: conversation.offtopic
+data: {"type":"conversation.offtopic","messageId":"ac_hist_01"}
+
+event: skill_code.cta
+data: {"type":"skill_code.cta","skillCode":"109","widget":"cta_doctor_visit_in_person_widget","text":"See doctor in person"}
+
+event: message.stop
+data: {"type":"message.stop","messageId":"ac_hist_02"}
+
+event: conversation.end
+data: {"type":"conversation.end","messageId":"ac_hist_02","reason":"AGENT_STOP_CODE"}
+
+retry: 3000
+event: ai_consultation.complete
+data: {"type":"ai_consultation.complete","artifacts":{"longSummary":"art_01","shortSummary":"art_02","soapNote":null}}
+
+event: error
+data: {"type":"error","errorCode":"error.rate_limited","message":"The service is busy right now. Please retry in a few moments.","retryAfterSeconds":7}
+
+event: future.event
+data: {"type":"future.event","anything":[1,2,3]}
+

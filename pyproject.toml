@@ -1,0 +1,89 @@
+[project]
+name = "doctronic"
+version = "0.1.0"
+description = "Python SDK for the Doctronic API"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Doctronic" }]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+]
+dependencies = [
+  "httpx>=0.27,<1",
+  "pydantic>=2.11,<3",
+]
+
+[project.urls]
+Homepage = "https://docs.doctronic.ai"
+Documentation = "https://docs.doctronic.ai"
+Repository = "https://github.com/doctronic-ai/doctronic-sdk-python"
+Issues = "https://github.com/doctronic-ai/doctronic-sdk-python/issues"
+Changelog = "https://github.com/doctronic-ai/doctronic-sdk-python/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+  "datamodel-code-generator==0.83.0",
+  "mypy==2.4.0",
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "respx==0.23.1",
+  "ruff==0.17.0",
+]
+
+[tool.uv]
+# Resolve only releases at least two weeks old. Move the date forward to take newer releases.
+exclude-newer = "2026-10-10T00:00:00Z"
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/doctronic"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/doctronic", "README.md", "CHANGELOG.md", "LICENSE"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["src/doctronic/_generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ASYNC", "PT"]
+ignore = [
+  "E501", # The formatter owns line length.
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["doctronic"]
+
+[tool.mypy]
+strict = true
+python_version = "3.10"
+files = ["src", "tests", "scripts", "examples"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "datamodel_code_generator.*"
+ignore_missing_imports = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+filterwarnings = ["error"]

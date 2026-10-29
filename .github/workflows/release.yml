@@ -1,0 +1,184 @@
+# Publishes doctronic to PyPI when a vX.Y.Z tag is pushed. The build job stops unless the tag
+# matches the package version and points at a commit on main. The publish job uploads only what
+# the build job built.
+#
+# Releases require:
+#
+# 1. The `pypi` environment's reviewer approval. The environment must require a reviewer and allow
+#    deployments only from `v*` tags. GitHub creates a missing environment without protection, so
+#    the environment must exist before anyone pushes a `v*` tag.
+# 2. A tag ruleset that lets only repository admins create, move, or delete `v*` tags.
+# 3. A PyPI trusted publisher for this workflow: project `doctronic`, owner `doctronic-ai`,
+#    repository `doctronic-sdk-python`, workflow `release.yml`, environment `pypi`. Before the
+#    project exists on PyPI, add it as a pending publisher: that lets the first release through
+#    this workflow create the project, but it doesn't reserve the name until the first upload.
+#
+# The version check requires the tag to be `v` plus the version in pyproject.toml, and that version
+# to equal `__version__` in src/doctronic/_version.py. It doesn't reject prereleases: a tag such
+# as `v1.0.0b1` passes when both files say 1.0.0b1.
+#
+# A tag push runs this file as it is at the tagged commit, so anyone who can push a tag can run a
+# modified copy. The checks below catch mistakes, not attacks. The protection comes from the
+# requirements above: the environment's reviewer, the tag ruleset, and the trusted publisher bound
+# to this workflow and environment.
+#
+# PyPI authenticates through OIDC, so there's no PyPI token. Only the publish job can mint the OIDC
+# token, and it runs no code from this repository. The publish action also uploads PEP 740
+# attestations, signed with Sigstore. Their signing certificate names this repository and
+# workflow, and Sigstore records it in a public transparency log.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  UV_VERSION: "0.11.19"
+
+jobs:
+  build:
+    name: Build and check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+
+      - name: Check the tag matches the package version
+        id: version
+        run: |
+          uv run --no-project python - <<'EOF'
+          import ast
+          import os
+          import sys
+          import tomllib
+
+          with open("pyproject.toml", "rb") as file:
+              version = tomllib.load(file)["project"]["version"]
+          with open("src/doctronic/_version.py", encoding="utf-8") as file:
+              module = ast.parse(file.read())
+          versions = [
+              node.value.value
+              for node in module.body
+              if isinstance(node, ast.Assign)
+              and isinstance(node.value, ast.Constant)
+              and any(isinstance(target, ast.Name) and target.id == "__version__" for target in node.targets)
+          ]
+          if versions != [version]:
+              print(f"::error::src/doctronic/_version.py sets __version__ to {versions}, but pyproject.toml has version {version}. Make them match.")
+              sys.exit(1)
+          tag = os.environ["GITHUB_REF_NAME"]
+          if tag != f"v{version}":
+              print(f"::error::Tag {tag} doesn't match the package version {version}. Tag v{version} instead.")
+              sys.exit(1)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\n")
+          EOF
+
+      - name: Check the tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::Tag $GITHUB_REF_NAME points at a commit that isn't on main. Tag a commit from main."
+            exit 1
+          fi
+
+      - name: Check the package isn't marked private
+        run: |
+          if grep -q "Private :: Do Not Upload" pyproject.toml; then
+            echo "::error::pyproject.toml has the \"Private :: Do Not Upload\" classifier. Remove it to publish."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Type check (mypy --strict)
+        run: uv run mypy
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Build the sdist and wheel
+        run: uv build
+
+      - name: Check dist holds only this version's sdist and wheel
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          find dist -mindepth 1 -maxdepth 1 -printf '%f\n' | sort > dist-files.txt
+          printf '%s\n' "doctronic-${VERSION}-py3-none-any.whl" "doctronic-${VERSION}.tar.gz" | sort > expected-files.txt
+          if ! diff -u expected-files.txt dist-files.txt; then
+            echo "::error::dist/ doesn't hold exactly the sdist and wheel for ${VERSION}. Use a normalized version in pyproject.toml."
+            exit 1
+          fi
+
+      - name: Check the wheel ships its types and generated models
+        run: |
+          wheel=$(ls dist/doctronic-*.whl)
+          unzip -l "$wheel" | tee wheel-contents.txt
+          grep -q "doctronic/py.typed" wheel-contents.txt
+          grep -q "doctronic/_generated/models.py" wheel-contents.txt
+          grep -q "doctronic/_generated/operations.py" wheel-contents.txt
+
+      - name: Import the installed wheel
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          uv venv --python 3.13 /tmp/wheel-venv
+          uv pip install --python /tmp/wheel-venv/bin/python dist/doctronic-*.whl
+          /tmp/wheel-venv/bin/python -c "import os, doctronic; assert doctronic.__version__ == os.environ['VERSION'], doctronic.__version__"
+
+      - name: Check the distributions with twine
+        run: uvx --from twine==7.0.0 twine check --strict dist/*
+
+      - name: Upload the distributions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/doctronic
+    permissions:
+      id-token: write
+    # No checkout: nothing from this repository runs where the OIDC token can be minted.
+    steps:
+      - name: Download the distributions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

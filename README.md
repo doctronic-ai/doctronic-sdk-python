@@ -1,2 +1,393 @@
-# doctronic-sdk-python
-Python SDK for the Doctronic API
+# Doctronic Python SDK
+
+Python client for the [Doctronic API](https://docs.doctronic.ai). Sync and async clients, typed
+models generated from the OpenAPI contract, typed chat stream events, safe retries, and webhook
+verification.
+
+Requires Python 3.10 or later. Runtime dependencies: `httpx` and `pydantic` v2.
+
+## Install
+
+```bash
+pip install doctronic
+# or
+uv add doctronic
+```
+
+## Quickstart
+
+Stream an assistant message in staging, using a synthetic patient. You need a staging API token;
+see [get access](https://docs.doctronic.ai/docs/authentication/#get-access). Run this from a
+terminal or your backend, and keep the token there.
+
+```bash
+export DOCTRONIC_API_TOKEN="replace-with-your-staging-token"
+```
+
+```python
+import uuid
+
+from doctronic import Doctronic
+from doctronic.types import MessageContentEvent, MessageStartEvent, MessageStopEvent
+
+client = Doctronic()  # Reads DOCTRONIC_API_TOKEN. Defaults to staging.
+
+# 1. Create a user, and save user.id on the patient record in your system.
+user = client.users.create(
+    first_name="Avery",
+    last_name="Chen",
+    date_of_birth="1990-06-15",
+    # Email and phone number must be unique per user, so each run uses a new email and no phone.
+    email=f"avery+quickstart-{uuid.uuid4()}@example.com",
+    sex="female",
+)
+patient = client.for_user(user.id)
+
+# 2. Create a chat.
+chat = patient.chats.create(timezone="America/New_York")
+
+# 3. Stream a patient turn.
+messages: dict[str, dict[str, str]] = {}
+with patient.chats.stream(
+    chat.id,
+    user_input="I have had a sore throat and fever since yesterday.",
+    timezone="America/New_York",
+) as stream:
+    for event in stream:
+        if isinstance(event, MessageStartEvent):
+            messages[event.message_id] = {"role": event.role, "text": ""}
+        elif isinstance(event, MessageContentEvent):
+            messages[event.message_id]["text"] += event.content
+        elif isinstance(event, MessageStopEvent):
+            print(messages[event.message_id])
+        else:
+            print(event.type, event)  # guardian, conversation.end, error, and any new event
+```
+
+[`examples/quickstart.py`](examples/quickstart.py) is the same program. A turn can emit a
+`guardian` event that your product must act on; read
+[Safety](https://docs.doctronic.ai/docs/safety/) before you show the stream to patients.
+
+### Async
+
+`AsyncDoctronic` has the same methods. Await each call, and iterate the stream with `async for`:
+
+```python
+import asyncio
+
+from doctronic import AsyncDoctronic
+
+
+async def main() -> None:
+    async with AsyncDoctronic() as client:
+        patient = client.for_user("mem_01K1EXAMPLE00000000000000")
+        chat = await patient.chats.create(timezone="America/New_York")
+        async with await patient.chats.stream(chat.id, user_input="Hello") as stream:
+            async for event in stream:
+                print(event.type)
+
+
+asyncio.run(main())
+```
+
+## Configuration
+
+```python
+client = Doctronic(
+    api_token="...",  # Default: DOCTRONIC_API_TOKEN. Required.
+    environment="production",  # "staging" or "production". Default: DOCTRONIC_ENVIRONMENT, then "staging".
+    base_url=None,  # Overrides the environment's base URL.
+    timeout=60.0,  # Seconds, or an httpx.Timeout. See below.
+    max_retries=2,  # Retries for reads and idempotent mutations.
+    http_client=None,  # Your own httpx.Client (httpx.AsyncClient for AsyncDoctronic).
+)
+```
+
+| Environment | Base URL |
+| --- | --- |
+| `staging` | `https://staging-partners.doctronic.ai/api/v1` |
+| `production` | `https://partners.doctronic.ai/api/v1` |
+
+`timeout` applies to each attempt, with httpx's semantics: connecting, sending, and each wait for
+data get up to that long. It isn't a wall-clock limit on the whole response. For a stream it
+covers the wait until the stream starts; after that, gaps between events never time out.
+
+Constructing a client without a token raises `DoctronicError`. The SDK never logs the token or
+puts it in an error message. Keep it on your backend: never in browser code, mobile apps, or
+model prompts.
+
+## User scope
+
+The token authenticates your organization; `X-Doctronic-User-ID` selects the patient. Two
+operations take the token alone, and they live on the base client:
+
+```python
+user = client.users.create(first_name="Avery")
+pharmacies = client.pharmacy.search(latitude=40.7608, longitude=-111.891)
+```
+
+Everything else acts on one patient. `for_user()` returns a client that sends the header on every
+request, so a user-scoped call can't go out without a user:
+
+```python
+patient = client.for_user(user.id)
+patient.users.update(phone_number="+15555550100", email=None)  # None clears; omitted keeps.
+```
+
+| Resource | Methods |
+| --- | --- |
+| `client.users` | `create` |
+| `client.pharmacy` | `search` |
+| `patient.users` | `retrieve`, `update` |
+| `patient.chats` | `create`, `list`, `retrieve`, `messages`, `stream` |
+| `patient.appointments` | `available_slots`, `create_scheduled`, `create_asap`, `list`, `retrieve`, `result`, `cancel`, `reschedule` |
+| `patient.address` | `retrieve`, `set` |
+| `patient.pharmacy` | `set` |
+| `patient.coverage` | `set` |
+| `patient.artifacts` | `retrieve`, `wait_until_ready` |
+
+Your backend decides which patient a request is for. Derive the user ID from the patient your
+system authenticated, never from an ID a browser or app sent you.
+
+## Models
+
+Methods return the `data` of the `{code, message, data}` envelope as pydantic models from
+`doctronic.types`. Each model has its contract name, such as `UserCreatedResponse`, and the short
+name the TypeScript SDK uses, such as `User`. Attributes are snake_case; the camelCase wire names
+are aliases, so `model.model_dump(by_alias=True)` gives the wire shape back. Fields the contract
+doesn't list yet are kept, not dropped.
+
+| Short name | Contract model |
+| --- | --- |
+| `User` | `UserCreatedResponse` |
+| `Chat`, `ChatPage` | `ChatResponse`, `PageChatResponse` |
+| `ChatMessage`, `ChatMessagePage` | `MessageResponse`, `PageMessageResponse` |
+| `Appointment`, `AppointmentPage`, `AppointmentStatus` | `AppointmentResponse`, `PageAppointmentResponse`, `AppointmentAPIStatus` |
+| `ScheduledAppointment`, `AsapAppointment` | `ScheduledAppointmentResponse`, `AsapAppointmentResponse` |
+| `AppointmentResult`, `AvailableSlots` | `AppointmentResultResponse`, `AvailableSlotsResponse` |
+| `Address`, `UsState` | `AddressResponse`, `State` |
+| `PharmacySearchResults` | `PharmacySearchResponse` |
+| `Artifact` | `ArtifactResponse`: one of `SoapNoteArtifactResponse`, `ClinicianNoteArtifactResponse`, `LongSummaryArtifactResponse`, `ShortSummaryArtifactResponse` |
+
+```python
+appointment = patient.appointments.retrieve("dc_01K1EXAMPLE00000000000000")
+appointment.waiting_room_url
+appointment.model_dump(mode="json", by_alias=True)  # {"waitingRoomUrl": ..., ...}
+```
+
+## Streaming
+
+`chats.stream()` sends one patient turn and returns the reply as typed events: a plain iterator
+on `Doctronic`, an async iterator on `AsyncDoctronic`. Use it as a context manager, or call
+`close()`, to release the connection when you stop early. The client's `timeout` covers the wait
+until the stream starts; after that the stream stays open as long as the assistant replies.
+
+Give the patient a cancel action that calls `close()`. It's safe to call from another thread or
+task: the code reading the stream then raises `APIUserAbortError`, and so does iterating any
+stream closed before its end, so a cancelled turn never looks finished. On `AsyncDoctronic`,
+cancelling the reading task also releases the connection; the `asyncio.CancelledError`
+propagates unchanged.
+
+| Event | Class | Fields |
+| --- | --- | --- |
+| `message.start` | `MessageStartEvent` | `role`, `message_id`, `message_timestamp` |
+| `message.content` | `MessageContentEvent` | `message_id`, `content` |
+| `message.stop` | `MessageStopEvent` | `message_id` |
+| `guardian` | `GuardianEvent` | `guardian_id`, `message` |
+| `conversation.offtopic` | `ConversationOfftopicEvent` | `message_id` |
+| `conversation.end` | `ConversationEndEvent` | `message_id`, `reason` |
+| `skill_code.cta` | `SkillCodeCtaEvent` | `skill_code`, `widget`, `text` |
+| `ai_consultation.complete` | `AiConsultationCompleteEvent` | `artifacts.long_summary`, `.short_summary`, `.soap_note` |
+| `error` | `StreamErrorEvent` | `error_code`, `message`, `retry_after_seconds` |
+| Anything else | `UnknownChatStreamEvent` | `type`, `data` (the parsed payload) |
+
+- **Unknown events never raise.** New event names arrive as `UnknownChatStreamEvent`; ignore the ones you
+  don't use yet.
+- **An `error` event is yielded, not raised.** Handle it apart from message text.
+- **Errors before the stream starts raise:** `ConflictError` for
+  `error.partner.chat_stream_in_progress`, `ServiceUnavailableError` for
+  `error.partner.chat_stream_unavailable`. A `200` that isn't `text/event-stream` raises
+  `APIResponseValidationError` rather than reading as an empty turn.
+- **The stream is never retried.** It takes no idempotency key, and the first attempt may already
+  have produced a reply. After a dropped connection (`APIConnectionError`) or an `error` event,
+  read `chats.messages(chat_id)` before you let the patient resend the turn.
+
+To relay events to your frontend, serialize them in the wire shape:
+`event.model_dump(by_alias=True, exclude_none=True)`.
+
+### Assemble messages
+
+`final_messages()` reads the rest of the stream and returns each message assembled by
+`message_id`, with the role from its `message.start`, plus every other event in arrival order. It
+includes events you already iterated over.
+
+```python
+with patient.chats.stream(chat.id, user_input="My fever is 101.5 F.") as stream:
+    final = stream.final_messages()
+
+for message in final.messages:
+    print(message.role, message.content, message.complete)  # complete: its message.stop arrived
+for event in final.control_events:
+    print(event.type)  # guardian, skill_code.cta, ai_consultation.complete, ...
+```
+
+## Consultation documents
+
+`artifacts.retrieve()` returns the document, or `None` while it's still generating (`202`).
+`wait_until_ready()` polls with exponential backoff from 1 to 16 seconds, for up to `timeout`
+seconds (default 120):
+
+```python
+from doctronic.types import AiConsultationCompleteEvent
+
+for event in final.control_events:
+    if isinstance(event, AiConsultationCompleteEvent) and event.artifacts.short_summary:
+        summary = patient.artifacts.wait_until_ready(event.artifacts.short_summary, timeout=120)
+        assert summary.content.chat_id == chat.id
+        print(summary.content.body)  # Markdown. Sanitize it before you render it.
+```
+
+`timeout` must be positive, and one deadline covers the whole wait: every poll, the retries
+inside each poll, and the waits between them. Each request's timeouts are capped by the time
+left. It stops with `NotFoundError` on `404`, `InternalServerError` on `500` (generation failed
+permanently), and `ArtifactNotReadyError` at the deadline. On `AsyncDoctronic`, cancel the task to
+stop early.
+
+`appointments.result()` works the same way: it returns `None` while the result isn't available
+yet.
+
+## Idempotency and retries
+
+The SDK sends an `Idempotency-Key` on the 11 operations whose contract declares one: every
+mutation except `chats.stream()`. It generates one key per call and reuses the same key and body
+on every retry of that call. Pass your own key to make a change safe to replay later, for example
+after your process restarts:
+
+```python
+patient.appointments.create_scheduled(
+    chat_id=chat.id,
+    starts_at=slot,
+    location={"state": "NY"},
+    idempotency_key=booking.id,  # One key per intended change; up to 255 characters.
+)
+```
+
+Retries follow the [retry checklist](https://docs.doctronic.ai/docs/errors/#retry-checklist):
+
+| Failure | Reads (`GET`) | Idempotent mutations | `chats.stream()` |
+| --- | --- | --- | --- |
+| Network error or timeout | Retried | Retried | Never |
+| `429`, `503` | Retried | Retried | Never |
+| Other `5xx` | Retried, unless the contract documents the status, like `500` from `artifacts.retrieve()` | Not retried | Never |
+| `409` without a documented state-conflict code (idempotency conflict) | Not retried | Retried | Never |
+| Other `4xx` | Not retried | Not retried | Never |
+
+Retries back off exponentially from 0.5 to 8 seconds, plus up to 25% jitter. A `Retry-After`
+header replaces the backoff; one over 60 seconds ends the retries so you decide when to try
+again.
+`max_retries` (default 2) caps the attempts; `max_retries=0` turns retries off. An error response
+cut off mid-body keeps its status and `Retry-After`, so the rules above still apply. A success
+response cut off mid-body counts as a network error.
+
+## Errors
+
+Every error subclasses `DoctronicError`. Responses with an error status raise an `APIError`
+subclass; branch on `status` and `code`, and show or log `message`.
+
+| Status | Class |
+| --- | --- |
+| `400`, `422` | `BadRequestError` |
+| `401` | `AuthenticationError` |
+| `403` | `PermissionDeniedError` |
+| `404` | `NotFoundError` |
+| `409` | `ConflictError` |
+| `429` | `RateLimitError` |
+| `503` | `ServiceUnavailableError` |
+| Other `5xx` | `InternalServerError` |
+| No response | `APIConnectionError`, and `APITimeoutError` for timeouts |
+| Stream closed before its end | `APIUserAbortError` |
+
+```python
+from doctronic import BadRequestError, ConflictError
+
+try:
+    patient.appointments.create_scheduled(chat_id=chat.id, starts_at=slot, location={"state": "NY"})
+except ConflictError as err:
+    if err.code == "error.appointments.slot_unavailable":
+        ...  # Refresh availability and ask the patient to choose again.
+except BadRequestError as err:
+    for field_error in err.field_errors:  # Set for error.validation_error, else empty.
+        print(field_error.field, field_error.code)
+```
+
+`APIError` carries `status`, `code` (`None` when the body has none), `message`, `data`, `headers`,
+`retry_after`, and `request_id` (from `X-Request-ID`). Keep `request_id` with your record of every failure so Doctronic can trace
+it. A success response that doesn't match the contract, such as one missing a required `data`,
+raises `APIResponseValidationError`, a subclass of `APIError` that is never retried.
+
+## Raw responses
+
+Prefix a call with `with_raw_response` to get an `APIResponse` with the status, headers, and
+request ID. `parse()` returns what the method normally returns.
+
+```python
+raw = client.with_raw_response.users.create(first_name="Avery")
+raw.status_code  # 201
+raw.request_id  # X-Request-ID
+raw.idempotency_key  # The key the SDK sent
+raw.idempotency_replayed  # True when the API replayed a stored response
+user = raw.parse()
+
+raw = patient.chats.with_raw_response.retrieve(chat.id)  # Also available per resource.
+```
+
+## Webhooks
+
+Verify each delivery against the raw request body before you parse it. `verify_webhook()` checks
+the `X-Doctronic-Signature` HMAC-SHA256 in constant time and returns a typed event; it raises
+`WebhookVerificationError` on a mismatch.
+
+```python
+from doctronic import SIGNATURE_HEADER, WebhookVerificationError, verify_webhook
+from doctronic.types import AppointmentWaitingRoomReadyEvent, ArtifactReadyEvent
+
+
+@app.post("/webhooks/doctronic")
+async def doctronic_webhook(request: Request) -> Response:
+    try:
+        event = verify_webhook(
+            await request.body(), request.headers.get(SIGNATURE_HEADER), WEBHOOK_SECRET
+        )
+    except WebhookVerificationError:
+        return Response(status_code=400)
+    if not seen_before(event.event_id):  # Deduplicate on event_id.
+        if isinstance(event, AppointmentWaitingRoomReadyEvent):
+            store_waiting_room_url(event.data.appointment_id, event.data.waiting_room_url)
+        elif isinstance(event, ArtifactReadyEvent):
+            enqueue_artifact_fetch(event.data.artifact_id)
+    return Response(status_code=200)  # Acknowledge unknown events too.
+```
+
+Events: `AppointmentWaitingRoomReadyEvent`, `AppointmentPractitionerJoinedEvent`,
+`AppointmentCallEndedEvent`, `ArtifactReadyEvent`, and `UnknownWebhookEvent` for event names this
+version doesn't know.
+
+## Development
+
+```bash
+uv sync                                  # Python environment with the pinned dev tools
+uv run pytest                            # Tests, against a mock API. No network calls.
+uv run ruff check . && uv run ruff format --check .
+uv run mypy                              # Strict
+uv run python scripts/generate.py        # Regenerate src/doctronic/_generated/
+```
+
+`scripts/generate.py [--contract <path|url>]` regenerates the models (datamodel-code-generator)
+and the operations table from the OpenAPI contract, by default the public contract at
+`https://docs.doctronic.ai/openapi/doctronic-v1.json`. The operations table is where the SDK
+reads which operations are idempotent and user-scoped. Commit the output. CI regenerates from the
+public contract and fails on any difference.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
