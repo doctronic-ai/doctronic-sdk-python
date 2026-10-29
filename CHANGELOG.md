@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 (2026-10-29)
+
+Built from the same contract as 0.1.0 (`info.version` 0.1.0, 22 operations).
 
 ### Changed
 
@@ -40,13 +42,31 @@
   `await`. `stream()` returns an `AsyncChatStreamManager`. Awaiting it still returns the
   `AsyncChatStream`, `async with await ...` still works, and it's still a coroutine for
   `asyncio.create_task()` and `asyncio.gather()`.
+- Python 3.14 and 3.15 in the classifiers and the CI test matrix.
+- Package metadata: keywords, and classifiers for the development status, audience, operating
+  system, topics, AsyncIO, and Pydantic 2.
+- `regenerate.yml`: when the docs publish a contract, and daily, it updates the pinned contract,
+  regenerates, runs the checks, and opens a pull request that lists new operations and is
+  labeled `breaking-change` when the docs flag one.
 - `contract-drift.yml`: a daily job that reports when the pinned contract falls behind the
   published one. It isn't a required check.
+- Each release gets a GitHub Release with its CHANGELOG entry as the notes. The release workflow
+  stops before publishing when the CHANGELOG has no entry for the version.
 
 ### Fixed
 
+- Building from the sdist accepts any hatchling from 1.27 (the first with PEP 639 license
+  metadata) up to 2, instead of exactly 1.32.4.
+- The sdist no longer includes the repository's `.gitignore`.
 - `PermissionDeniedError` described a `403` for a user the organization can't act on. The
   contract documents `403` only for `error.auth.insufficient_scope`; that user case is a `404`.
+
+### Security
+
+- certifi before 2026.10.18 bundles emSign root CAs whose intermediate keys were compromised
+  (GHSA-6q48-6c7w-9gw2). httpx uses certifi for TLS verification. The SDK doesn't pin certifi,
+  so upgrade it in your environment: `pip install --upgrade "certifi>=2026.10.18"`. The
+  repository's lockfile now has 2026.10.23.
 
 ## 0.1.0 (2026-10-28)
 

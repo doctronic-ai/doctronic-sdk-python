@@ -1,19 +1,43 @@
 [project]
 name = "doctronic"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python SDK for the Doctronic API"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "Doctronic" }]
+keywords = [
+  "doctronic",
+  "healthcare",
+  "telehealth",
+  "api-client",
+  "sdk",
+  "openapi",
+  "webhooks",
+  "server-sent-events",
+  "pydantic",
+  "httpx",
+]
+# No License classifier: the license is the PEP 639 expression above, and PyPI rejects a
+# License classifier next to one.
 classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: AsyncIO",
+  "Framework :: Pydantic :: 2",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Healthcare Industry",
+  "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+  "Topic :: Scientific/Engineering :: Medical Science Apps.",
+  "Topic :: Software Development :: Libraries :: Python Modules",
   "Typing :: Typed",
 ]
 dependencies = [
@@ -50,7 +74,9 @@ exclude-newer = "14 days"
 exclude-newer-package = { certifi = false }
 
 [build-system]
-requires = ["hatchling==1.32.4"]
+# 1.27 is the first hatchling with PEP 639 license metadata (`license` as an SPDX expression,
+# `license-files`).
+requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -58,6 +84,9 @@ packages = ["src/doctronic"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/doctronic", "README.md", "CHANGELOG.md", "LICENSE"]
+
+# Hatchling force-includes the repository's .gitignore in the sdist; hatch_build.py removes it.
+[tool.hatch.build.targets.sdist.hooks.custom]
 
 [tool.ruff]
 line-length = 100

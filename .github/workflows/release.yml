@@ -1,6 +1,15 @@
-# Publishes doctronic to PyPI when a vX.Y.Z tag is pushed. The build job stops unless the tag
-# matches the package version and points at a commit on main. The publish job uploads only what
-# the build job built.
+# Publishes doctronic to PyPI when a vX.Y.Z tag is pushed, then creates the GitHub Release.
+#
+# 1. build: stops unless the tag matches the package version, the tagged commit is on main, and
+#    CHANGELOG.md has a `## X.Y.Z (YYYY-MM-DD)` entry for the version. Then it runs the checks,
+#    builds the sdist and wheel, and keeps the CHANGELOG entry as the release notes.
+# 2. publish: uploads only what the build job built. It has only `id-token: write`.
+# 3. github-release: after PyPI accepts the upload, creates the GitHub Release for the tag from the
+#    CHANGELOG entry, titled with the version. It's a separate job because it needs
+#    `contents: write`, which the publish job must not have.
+#
+# 0.1.0 went out through this workflow before the github-release job existed; its Release was
+# created by hand from the same CHANGELOG entry.
 #
 # Releases require:
 #
@@ -40,7 +49,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  UV_VERSION: "0.11.19"
+  UV_VERSION: "0.13.0"
 
 jobs:
   build:
@@ -93,6 +102,27 @@ jobs:
               output.write(f"version={version}\n")
           EOF
 
+      - name: Check the CHANGELOG has an entry for this version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          escaped=$(printf '%s' "$VERSION" | sed 's/[.]/\\./g')
+          if ! grep -Eq "^## ${escaped} \([0-9]{4}-[0-9]{2}-[0-9]{2}\)$" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no \"## ${VERSION} (YYYY-MM-DD)\" heading. Add the entry for ${VERSION} before tagging."
+            exit 1
+          fi
+          # The entry runs from its heading to the next "## " heading.
+          awk -v heading="## ${VERSION} (" 'index($0, heading) == 1 { found = 1; next } found && /^## / { exit } found { print }' \
+            CHANGELOG.md > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::error::The CHANGELOG.md entry for ${VERSION} is empty."
+            exit 1
+          fi
+          {
+            echo
+            echo "Published to PyPI as [\`doctronic ${VERSION}\`](https://pypi.org/project/doctronic/${VERSION}/)."
+          } >> release-notes.md
+
       - name: Check the tagged commit is on main
         run: |
           if ! git merge-base --is-ancestor HEAD origin/main; then
@@ -139,6 +169,13 @@ jobs:
             exit 1
           fi
 
+      - name: Check the sdist leaves out VCS ignore files
+        run: |
+          if tar -tzf dist/doctronic-*.tar.gz | grep -E '/\.(git|hg)ignore$'; then
+            echo "::error::The sdist ships a VCS ignore file. hatch_build.py should remove it."
+            exit 1
+          fi
+
       - name: Check the wheel ships its types and generated models
         run: |
           wheel=$(ls dist/doctronic-*.whl)
@@ -165,6 +202,13 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+      - name: Upload the release notes
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
   publish:
     name: Publish to PyPI
     needs: build
@@ -185,3 +229,29 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  github-release:
+    name: Create the GitHub Release
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    # No checkout: the notes come from the build job, and gh needs only the tag.
+    steps:
+      - name: Download the release notes
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+
+      # A PEP 440 pre-release (1.0.0a1, 1.0.0b2, 1.0.0rc1) or development release is marked as a
+      # prerelease, as the TypeScript SDK marks its prerelease versions.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          prerelease=()
+          if [[ "$version" =~ (a|b|rc)[0-9]+|\.dev[0-9]+ ]]; then prerelease=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$version" --notes-file release-notes.md "${prerelease[@]}"

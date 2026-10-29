@@ -1,33 +1,36 @@
-# Reports when openapi/doctronic-v1.json, the pinned copy of the contract the SDK is generated
-# from, differs from the contract the docs publish. It never commits or opens a pull request:
-# regenerate.yml does that. It isn't a required check, and it doesn't run on pull requests, so a
-# new published contract never blocks unrelated work.
+# Reports when the published contract no longer matches the pinned copy in
+# openapi/doctronic-v1.json. The required codegen check reads only the pinned copy, so it can't see
+# this. regenerate.yml opens the pull request that catches up; this run only reports, and isn't a
+# required check. It fails when the published contract changes the generated code, or doesn't
+# regenerate, and warns when only the contract's bytes differ.
+#
+# The TypeScript SDK's contract-drift.yml works the same way.
 
 name: Contract drift
 
 on:
   schedule:
-    # Daily at 14:29 UTC, after the docs' daily API sync. The odd minute avoids the busiest
-    # times in the Actions queue.
-    - cron: "29 14 * * *"
+    # Daily at 15:47 UTC, after regenerate.yml's daily run.
+    - cron: "47 15 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: contract-drift
   cancel-in-progress: true
 
 env:
-  UV_VERSION: "0.11.19"
+  UV_VERSION: "0.13.0"
   PUBLIC_CONTRACT_URL: https://docs.doctronic.ai/openapi/doctronic-v1.json
 
 jobs:
   drift:
-    name: Pinned contract matches the published contract
+    name: Compare the pinned contract with the published one
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -65,6 +68,7 @@ jobs:
         run: |
           uv run python scripts/generate.py --contract "$RUNNER_TEMP/published.json" 2>&1 \
             | tee "$RUNNER_TEMP/generate.log"
+          git add --intent-to-add src/doctronic/_generated
           git diff --stat -- src/doctronic/_generated > "$RUNNER_TEMP/generated.txt"
 
       - name: Report
@@ -113,7 +117,10 @@ jobs:
             echo "::error::openapi/doctronic-v1.json is behind $PUBLIC_CONTRACT_URL, and the published contract doesn't regenerate. The run summary has the details."
             exit 1
           fi
-          if [ "$CHANGED" = "true" ]; then
-            echo "::error::openapi/doctronic-v1.json is behind $PUBLIC_CONTRACT_URL. The run summary lists the changes."
+          if [ "$CHANGED" = "true" ] && [ -s "$RUNNER_TEMP/generated.txt" ]; then
+            echo "::error::The published contract changes the generated code. Run regenerate.yml, or merge its open pull request."
             exit 1
+          fi
+          if [ "$CHANGED" = "true" ]; then
+            echo "::warning::The published contract differs from openapi/doctronic-v1.json, but the generated code doesn't change. Run regenerate.yml to update the pinned copy."
           fi
