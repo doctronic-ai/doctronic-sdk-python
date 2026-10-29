@@ -14,7 +14,6 @@ concurrency:
 
 env:
   UV_VERSION: "0.11.19"
-  PUBLIC_CONTRACT_URL: https://docs.doctronic.ai/openapi/doctronic-v1.json
 
 jobs:
   lint:
@@ -147,14 +146,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Regenerate from the public contract
-        run: uv run python scripts/generate.py --contract "$PUBLIC_CONTRACT_URL"
+      # From openapi/doctronic-v1.json, the pinned copy of the public contract, so this check
+      # only changes when a commit changes the pin or the generator. A new published contract
+      # reaches the SDK through a pull request that updates the pin (regenerate.yml), and
+      # contract-drift.yml reports when the pin falls behind.
+      - name: Regenerate from the pinned contract
+        run: uv run python scripts/generate.py
 
       - name: Fail on any difference
         run: |
           git status --porcelain -- src/doctronic/_generated
           if [ -n "$(git status --porcelain -- src/doctronic/_generated)" ]; then
             git diff -- src/doctronic/_generated
-            echo "::error::src/doctronic/_generated is out of date with $PUBLIC_CONTRACT_URL. Run scripts/generate.py and commit the result."
+            echo "::error::src/doctronic/_generated is out of date with openapi/doctronic-v1.json. Run scripts/generate.py and commit the result."
             exit 1
           fi

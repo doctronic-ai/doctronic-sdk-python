@@ -104,8 +104,12 @@ class AuthenticationError(APIError):
 
 
 class PermissionDeniedError(APIError):
-    """403: the API key lacks the scope the operation requires (`error.auth.insufficient_scope`),
-    or the organization can't act on the user in `X-Doctronic-User-ID`."""
+    """403 `error.auth.insufficient_scope`: the API key lacks the scope the operation requires.
+
+    `data` validates as `doctronic.types.InsufficientScopeData`, whose `required_scope` names the
+    missing `Scope`. Retrying doesn't help; the key needs that scope. A user your organization
+    can't act on is a `NotFoundError`, not this error.
+    """
 
 
 class NotFoundError(APIError):
@@ -154,9 +158,11 @@ class APIUserAbortError(DoctronicError):
 
 
 class APIResponseValidationError(APIError):
-    """A success response that doesn't match the contract, such as a missing `data` field.
+    """A success response the SDK can't use: a body that isn't JSON, a `data` field missing from
+    an operation that returns data, or a `200` stream that isn't `text/event-stream`.
 
-    An `APIError`, so handlers for API errors catch it too. Not retried.
+    Data that only differs from the contract, such as a missing field or an unknown enum value,
+    doesn't raise. An `APIError`, so handlers for API errors catch it too. Not retried.
     """
 
     def __init__(self, message: str, *, status: int, headers: httpx.Headers) -> None:

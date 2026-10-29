@@ -8,7 +8,12 @@ from typing import Any
 
 import pytest
 
-from doctronic import SIGNATURE_HEADER, WebhookVerificationError, verify_webhook
+from doctronic import (
+    SIGNATURE_HEADER,
+    WEBHOOK_SIGNATURE_HEADER,
+    WebhookVerificationError,
+    verify_webhook,
+)
 from doctronic.types import (
     AppointmentCallEndedEvent,
     AppointmentPractitionerJoinedEvent,
@@ -32,7 +37,8 @@ def sign(body: bytes, secret: str = SECRET) -> str:
 
 
 def test_signature_header_name() -> None:
-    assert SIGNATURE_HEADER == "X-Doctronic-Signature"
+    assert WEBHOOK_SIGNATURE_HEADER == "X-Doctronic-Signature"
+    assert SIGNATURE_HEADER == WEBHOOK_SIGNATURE_HEADER  # The 0.1.0 name.
 
 
 def test_waiting_room_ready() -> None:
@@ -156,7 +162,9 @@ def test_signed_but_invalid_envelope_fails(body: bytes) -> None:
         verify_webhook(body, sign(body), SECRET)
 
 
-def test_empty_secret_is_rejected() -> None:
-    body = b"{}"
-    with pytest.raises(ValueError, match="secret"):
+def test_empty_secret_is_rejected_as_a_verification_failure() -> None:
+    # A handler that answers WebhookVerificationError with 400 must also reject deliveries when
+    # its secret isn't configured, even when the attacker signs with the empty key.
+    body = delivery("appointment.call_ended", {"appointmentId": "dc_01", "userId": "mem_01"})
+    with pytest.raises(WebhookVerificationError, match="secret"):
         verify_webhook(body, sign(body, ""), "")

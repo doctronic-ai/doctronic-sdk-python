@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import random
 
@@ -13,6 +14,7 @@ from doctronic import (
     APIResponseValidationError,
     APIUserAbortError,
     AsyncChatStream,
+    AsyncChatStreamManager,
     AsyncDoctronic,
     ChatStream,
     ConflictError,
@@ -34,6 +36,8 @@ from doctronic.types import (
     UnknownChatStreamEvent,
 )
 from tests.helpers import (
+    BASE_URL,
+    TOKEN,
     USER_ID,
     collect,
     drain,
@@ -479,3 +483,86 @@ async def test_frames_already_read_are_dropped_after_an_abort(
 
     with pytest.raises(APIUserAbortError):
         await next_from_generator(stream)
+
+
+# `AsyncDoctronic` `chats.stream()` works with `async with`, `await`, and asyncio's task APIs.
+
+
+async def async_client(api: respx.MockRouter) -> AsyncDoctronic:
+    mock_stream(api, [recorded_stream()])
+    return AsyncDoctronic(api_token=TOKEN, base_url=BASE_URL)
+
+
+@pytest.mark.asyncio
+async def test_async_stream_works_with_async_with_and_no_await(api: respx.MockRouter) -> None:
+    async with await async_client(api) as client:
+        async with client.for_user(USER_ID).chats.stream("chat_01", user_input="Hi") as stream:
+            assert isinstance(stream, AsyncChatStream)
+            first = await stream.__anext__()
+            assert isinstance(first, MessageStartEvent)
+
+        # Leaving the block closed the stream before its end.
+        with pytest.raises(APIUserAbortError):
+            await stream.__anext__()
+
+
+@pytest.mark.asyncio
+async def test_async_stream_can_still_be_awaited(api: respx.MockRouter) -> None:
+    async with await async_client(api) as client:
+        patient = client.for_user(USER_ID)
+        stream = await patient.chats.stream("chat_01", user_input="Hi")
+        assert isinstance(stream, AsyncChatStream)
+        await stream.close()
+
+        async with await patient.chats.stream("chat_01", user_input="Hi") as again:
+            assert isinstance(again, AsyncChatStream)
+
+
+@pytest.mark.asyncio
+async def test_async_stream_is_a_coroutine_for_asyncio(api: respx.MockRouter) -> None:
+    async with await async_client(api) as client:
+        manager = client.for_user(USER_ID).chats.stream("chat_01", user_input="Hi")
+        assert isinstance(manager, AsyncChatStreamManager)
+        assert asyncio.iscoroutine(manager)
+
+        stream = await asyncio.create_task(manager)
+        (gathered,) = await asyncio.gather(
+            client.for_user(USER_ID).chats.stream("chat_01", user_input="Hi")
+        )
+        assert isinstance(stream, AsyncChatStream)
+        assert isinstance(gathered, AsyncChatStream)
+        await stream.close()
+        await gathered.close()
+
+
+@pytest.mark.asyncio
+async def test_async_stream_sends_nothing_until_entered(api: respx.MockRouter) -> None:
+    async with await async_client(api) as client:
+        route = api.routes[0]
+        manager = client.for_user(USER_ID).chats.stream("chat_01", user_input="Hi")
+        assert route.call_count == 0
+        async with manager as stream:
+            assert route.call_count == 1
+            assert stream.request_id == "req_stream"
+
+
+@pytest.mark.asyncio
+async def test_async_stream_errors_raise_from_async_with(api: respx.MockRouter) -> None:
+    api.post("/chats/chat_01/stream/").mock(
+        return_value=error(409, "error.partner.chat_stream_in_progress")
+    )
+    async with AsyncDoctronic(api_token=TOKEN, base_url=BASE_URL) as client:
+        with pytest.raises(ConflictError):
+            async with client.for_user(USER_ID).chats.stream("chat_01", user_input="Hi"):
+                pytest.fail("The block must not run when the stream doesn't start.")
+
+
+@pytest.mark.asyncio
+async def test_async_stream_raw_response(api: respx.MockRouter) -> None:
+    async with await async_client(api) as client:
+        chats = client.for_user(USER_ID).chats
+        raw = await chats.with_raw_response.stream("chat_01", user_input="Hi")
+        assert raw.status_code == 200
+        stream = raw.parse()
+        assert isinstance(stream, AsyncChatStream)
+        await stream.close()

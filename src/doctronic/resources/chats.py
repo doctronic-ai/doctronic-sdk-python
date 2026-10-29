@@ -22,7 +22,7 @@ from .._response import (
     parse_model,
     to_raw_response_wrapper,
 )
-from .._streaming import AsyncChatStream, ChatStream
+from .._streaming import AsyncChatStream, AsyncChatStreamManager, ChatStream
 from .._types import NOT_GIVEN, NotGiven
 
 __all__ = ["AsyncChatsResource", "ChatsResource"]
@@ -202,24 +202,31 @@ class AsyncChatsResource(AsyncAPIResource):
             _messages_options(chat_id, page, size, order_by), _parse_message_page
         )
 
-    async def stream(
+    def stream(
         self,
         chat_id: str,
         *,
         user_input: str,
         message_prompt_context: str | NotGiven | None = NOT_GIVEN,
         timezone: str | NotGiven = NOT_GIVEN,
-    ) -> AsyncChatStream:
+    ) -> AsyncChatStreamManager:
         """`POST /chats/{chatId}/stream/`: send one patient turn and stream the reply.
+
+        Use it as `async with patient.chats.stream(...) as stream:`, or await it for the
+        `AsyncChatStream`.
 
         Raises `ConflictError` (`error.partner.chat_stream_in_progress`) or
         `ServiceUnavailableError` (`error.partner.chat_stream_unavailable`) before the stream
         starts. Never retried.
         """
-        return await self._request(
-            _stream_options(chat_id, user_input, message_prompt_context, timezone),
-            _open_async_stream,
-        )
+
+        async def open_stream() -> AsyncChatStream:
+            return await self._request(
+                _stream_options(chat_id, user_input, message_prompt_context, timezone),
+                _open_async_stream,
+            )
+
+        return AsyncChatStreamManager(open_stream())
 
     @cached_property
     def with_raw_response(self) -> AsyncChatsResourceWithRawResponse:

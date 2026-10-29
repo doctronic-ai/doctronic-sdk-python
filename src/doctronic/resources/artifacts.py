@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
 from functools import cached_property
 
-import pydantic
+import httpx
 
 from .. import _retry
 from .._base_client import DeadlineExceeded, RequestOptions
@@ -23,7 +24,9 @@ DEFAULT_WAIT_TIMEOUT = 120.0
 _FIRST_POLL_DELAY = 1.0
 _MAX_POLL_DELAY = 16.0
 
-_parse_artifact = none_while_pending(parse_data(pydantic.TypeAdapter(ArtifactResponse)))
+_parse_artifact: Callable[[httpx.Response], ArtifactResponse | None] = none_while_pending(
+    parse_data(ArtifactResponse)
+)
 
 
 def _retrieve_options(artifact_id: str, deadline: float | None = None) -> RequestOptions:
