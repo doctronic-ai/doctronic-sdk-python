@@ -123,7 +123,10 @@ jobs:
         run: uv run pytest
 
       - name: Build the sdist and wheel
-        run: uv build
+        # uv also writes dist/.gitignore, which isn't a distribution and must not reach PyPI.
+        run: |
+          uv build
+          rm -f dist/.gitignore
 
       - name: Check dist holds only this version's sdist and wheel
         env:
