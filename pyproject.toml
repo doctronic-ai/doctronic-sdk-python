@@ -42,6 +42,12 @@ dev = [
 # Resolve only releases at least two weeks old. uv works out the cutoff each time it locks, so
 # `uv lock --upgrade` and Dependabot (cooldown in .github/dependabot.yml) follow the same rule.
 exclude-newer = "14 days"
+# The floor applies to security updates too, so a fix released less than two weeks ago doesn't
+# resolve until the package is listed here. Each entry is temporary: remove it once the locked
+# version is two weeks old. See "Security updates" in CONTRIBUTING.md.
+#
+# - certifi: GHSA-6q48-6c7w-9gw2 (emSign roots), fixed in 2026.10.18. Remove after 2026-11-06.
+exclude-newer-package = { certifi = false }
 
 [build-system]
 requires = ["hatchling==1.32.4"]
