@@ -54,7 +54,7 @@ Changelog = "https://github.com/doctronic-ai/doctronic-sdk-python/blob/main/CHAN
 
 [dependency-groups]
 dev = [
-  "datamodel-code-generator==0.83.0",
+  "datamodel-code-generator==0.84.0",
   "mypy==2.4.0",
   "pytest==9.1.1",
   "pytest-asyncio==1.4.0",
