@@ -127,9 +127,12 @@ jobs:
       changed: ${{ steps.changes.outputs.changed }}
       checks: ${{ steps.checks.outcome }}
     steps:
+      # Always main, the pull request's base: a manual run from another branch still regenerates
+      # and checks against the SDK on main.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: main
           persist-credentials: false
 
       - name: Set up uv
@@ -336,10 +339,13 @@ jobs:
           fi
 
       # This job runs no repository code, so the checkout keeps its credentials, as
-      # create-pull-request expects. It swaps in the app token for its own git operations.
+      # create-pull-request expects. It swaps in the app token for its own git operations. Always
+      # main, like the regenerate job, so the files apply to the pull request's base.
       - name: Checkout
         if: steps.token.outputs.ok == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
 
       - name: Download the regenerated files
         if: steps.token.outputs.ok == 'true' && needs.regenerate.outputs.changed == 'true'
