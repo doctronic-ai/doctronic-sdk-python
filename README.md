@@ -2,9 +2,11 @@
 
 Python client for the [Doctronic API](https://docs.doctronic.ai). Sync and async clients, typed
 models generated from the OpenAPI contract, typed chat stream events, safe retries, and webhook
-verification.
+verification. For Node.js, use the [TypeScript SDK](https://github.com/doctronic-ai/doctronic-sdk-typescript)
+(`@doctronic-ai/sdk` on npm), which covers the same operations.
 
-Requires Python 3.10 or later. Runtime dependencies: `httpx` and `pydantic` v2.
+Requires Python 3.10 or later; CI tests 3.10 to 3.15. Runtime dependencies: `httpx` and
+`pydantic` v2.
 
 ## Install
 
@@ -64,13 +66,14 @@ with patient.chats.stream(
             print(event.type, event)  # guardian, conversation.end, error, and any new event
 ```
 
-[`examples/quickstart.py`](examples/quickstart.py) is the same program. A turn can emit a
+[`examples/quickstart.py`](https://github.com/doctronic-ai/doctronic-sdk-python/blob/main/examples/quickstart.py) is the same program. A turn can emit a
 `guardian` event that your product must act on; read
 [Safety](https://docs.doctronic.ai/docs/safety/) before you show the stream to patients.
 
 ### Async
 
-`AsyncDoctronic` has the same methods. Await each call, and iterate the stream with `async for`:
+`AsyncDoctronic` has the same methods. Await each call, open the stream with `async with`, and
+iterate it with `async for`:
 
 ```python
 import asyncio
@@ -82,13 +85,16 @@ async def main() -> None:
     async with AsyncDoctronic() as client:
         patient = client.for_user("mem_01K1EXAMPLE00000000000000")
         chat = await patient.chats.create(timezone="America/New_York")
-        async with await patient.chats.stream(chat.id, user_input="Hello") as stream:
+        async with patient.chats.stream(chat.id, user_input="Hello") as stream:
             async for event in stream:
                 print(event.type)
 
 
 asyncio.run(main())
 ```
+
+`await patient.chats.stream(...)` also works, and returns the `AsyncChatStream` for you to
+`close()`. So does `async with await ...`, the form 0.1.0 needed.
 
 ## Configuration
 
@@ -154,8 +160,18 @@ system authenticated, never from an ID a browser or app sent you.
 Methods return the `data` of the `{code, message, data}` envelope as pydantic models from
 `doctronic.types`. Each model has its contract name, such as `UserCreatedResponse`, and the short
 name the TypeScript SDK uses, such as `User`. Attributes are snake_case; the camelCase wire names
-are aliases, so `model.model_dump(by_alias=True)` gives the wire shape back. Fields the contract
-doesn't list yet are kept, not dropped.
+are aliases, so `model.model_dump(by_alias=True)` gives the wire shape back.
+
+Responses from a newer API don't fail, so you can ignore what you don't know yet:
+
+- Fields the contract doesn't list yet are kept, in `model.model_extra`.
+- Enums accept values this version doesn't list. A new appointment status arrives as an
+  `AppointmentStatus` that equals the string, such as `"on_hold"`; the known values are the usual
+  members. Compare with the members you handle and treat anything else as unknown.
+- Data that doesn't match the contract, such as a missing field or a value of another type, is
+  returned rather than raised: fields that match are typed, and the rest are kept as sent.
+  Missing required fields are `None`; optional fields keep their defaults. The SDK logs a warning
+  on the `doctronic` logger with the request ID and the field names, never their values.
 
 | Short name | Contract model |
 | --- | --- |
@@ -279,8 +295,14 @@ Retries follow the [retry checklist](https://docs.doctronic.ai/docs/errors/#retr
 | Network error or timeout | Retried | Retried | Never |
 | `429`, `503` | Retried | Retried | Never |
 | Other `5xx` | Retried, unless the contract documents the status, like `500` from `artifacts.retrieve()` | Not retried | Never |
-| `409` without a documented state-conflict code (idempotency conflict) | Not retried | Retried | Never |
+| `409` whose code isn't final for the operation (see below) | Not retried | Retried | Never |
 | Other `4xx` | Not retried | Not retried | Never |
+
+A `409` code the contract documents for the operation, such as
+`error.appointments.slot_unavailable`, is final and isn't retried, unless the contract lists it in
+`x-doctronic-retryable-codes` as safe to retry with the same key, such as
+`error.idempotency.concurrent_request`. A `409` without a code, or with one the contract doesn't
+document, is an idempotency conflict and is retried with the same key.
 
 Retries back off exponentially from 0.5 to 8 seconds, plus up to 25% jitter. A `Retry-After`
 header replaces the backoff; one over 60 seconds ends the retries so you decide when to try
@@ -321,9 +343,17 @@ except BadRequestError as err:
 ```
 
 `APIError` carries `status`, `code` (`None` when the body has none), `message`, `data`, `headers`,
-`retry_after`, and `request_id` (from `X-Request-ID`). Keep `request_id` with your record of every failure so Doctronic can trace
-it. A success response that doesn't match the contract, such as one missing a required `data`,
-raises `APIResponseValidationError`, a subclass of `APIError` that is never retried.
+`retry_after`, and `request_id` (from `X-Request-ID`). Keep `request_id` with your record of every
+failure so Doctronic can trace it.
+
+A `403` is `error.auth.insufficient_scope`: the API key lacks a scope.
+`InsufficientScopeData.model_validate(err.data).required_scope` names it. A user your organization
+can't act on is a `404`.
+
+A success response the SDK can't use raises `APIResponseValidationError`, a subclass of `APIError`
+that is never retried: a body that isn't JSON, a missing or `null` `data` for an operation that
+returns data, or a `200` stream that isn't `text/event-stream`. Data that only differs from the
+contract doesn't raise; see Models above.
 
 ## Raw responses
 
@@ -344,22 +374,34 @@ raw = patient.chats.with_raw_response.retrieve(chat.id)  # Also available per re
 ## Webhooks
 
 Verify each delivery against the raw request body before you parse it. `verify_webhook()` checks
-the `X-Doctronic-Signature` HMAC-SHA256 in constant time and returns a typed event; it raises
-`WebhookVerificationError` on a mismatch.
+the `X-Doctronic-Signature` HMAC-SHA256 in constant time and returns a typed event. It raises
+`WebhookVerificationError` when the signature doesn't match, when the signed body isn't a valid
+event, and when the secret is empty, so a missing secret rejects every delivery.
+
+With FastAPI:
 
 ```python
-from doctronic import SIGNATURE_HEADER, WebhookVerificationError, verify_webhook
+import os
+
+from fastapi import FastAPI, Request, Response
+
+from doctronic import WEBHOOK_SIGNATURE_HEADER, WebhookVerificationError, verify_webhook
 from doctronic.types import AppointmentWaitingRoomReadyEvent, ArtifactReadyEvent
+
+app = FastAPI()
+# Your app's own setting. The SDK doesn't read environment variables for webhooks.
+WEBHOOK_SECRET = os.environ["DOCTRONIC_WEBHOOK_SECRET"]
 
 
 @app.post("/webhooks/doctronic")
 async def doctronic_webhook(request: Request) -> Response:
     try:
         event = verify_webhook(
-            await request.body(), request.headers.get(SIGNATURE_HEADER), WEBHOOK_SECRET
+            await request.body(), request.headers.get(WEBHOOK_SIGNATURE_HEADER), WEBHOOK_SECRET
         )
     except WebhookVerificationError:
         return Response(status_code=400)
+    # seen_before, store_waiting_room_url, and enqueue_artifact_fetch stand for your own code.
     if not seen_before(event.event_id):  # Deduplicate on event_id.
         if isinstance(event, AppointmentWaitingRoomReadyEvent):
             store_waiting_room_url(event.data.appointment_id, event.data.waiting_room_url)
@@ -368,9 +410,41 @@ async def doctronic_webhook(request: Request) -> Response:
     return Response(status_code=200)  # Acknowledge unknown events too.
 ```
 
+`WEBHOOK_SIGNATURE_HEADER` is the TypeScript SDK's name for the header. `SIGNATURE_HEADER`, the
+0.1.0 name, still works.
+
 Events: `AppointmentWaitingRoomReadyEvent`, `AppointmentPractitionerJoinedEvent`,
 `AppointmentCallEndedEvent`, `ArtifactReadyEvent`, and `UnknownWebhookEvent` for event names this
 version doesn't know.
+
+## Versioning
+
+The SDK follows [semantic versioning](https://semver.org). Before 1.0, a minor release (0.2.0) can
+change the public API; a patch release (0.1.2) fixes bugs and adds features without breaking code
+written for the same minor version. Every change SDK users can see is in the
+[CHANGELOG](https://github.com/doctronic-ai/doctronic-sdk-python/blob/main/CHANGELOG.md) and on the
+[GitHub Releases](https://github.com/doctronic-ai/doctronic-sdk-python/releases) page.
+
+Each release is generated from a pinned copy of the API contract, and its CHANGELOG entry names
+the contract version. The SDK keeps working when the API adds fields, enum values, stream events,
+or webhook events (see Models above). New operations need a new SDK release.
+
+Each release supports the Python versions that CI tests, 3.10 to 3.15 today. A Python version is
+dropped only in a minor release, after it reaches its end of life.
+
+## Support
+
+- **Using the API:** the [Doctronic API documentation](https://docs.doctronic.ai) has the guides,
+  the reference, and the [errors](https://docs.doctronic.ai/docs/errors/) and webhook pages. For
+  access or account questions, see [get access](https://docs.doctronic.ai/docs/authentication/#get-access).
+- **SDK bugs and requests:** open an [issue](https://github.com/doctronic-ai/doctronic-sdk-python/issues/new/choose).
+  Issues are public: **never post API tokens, webhook secrets, patient data, or PHI.** Include the
+  `request_id` of a failed call.
+- **Security vulnerabilities:** report them privately at
+  <https://github.com/doctronic-ai/doctronic-sdk-python/security/advisories/new>, never in an issue.
+  See the [security policy](https://github.com/doctronic-ai/doctronic-sdk-python/blob/main/SECURITY.md).
+- **Supported releases:** fixes, including security fixes, go to the latest release. Upgrade to
+  get them.
 
 ## Development
 
@@ -382,12 +456,15 @@ uv run mypy                              # Strict
 uv run python scripts/generate.py        # Regenerate src/doctronic/_generated/
 ```
 
-`scripts/generate.py [--contract <path|url>]` regenerates the models (datamodel-code-generator)
-and the operations table from the OpenAPI contract, by default the public contract at
-`https://docs.doctronic.ai/openapi/doctronic-v1.json`. The operations table is where the SDK
-reads which operations are idempotent and user-scoped. Commit the output. CI regenerates from the
-public contract and fails on any difference.
+`scripts/generate.py` regenerates the models (datamodel-code-generator) and the operations table
+from `openapi/doctronic-v1.json`, a pinned copy of the public contract at
+`https://docs.doctronic.ai/openapi/doctronic-v1.json`. Pass `--contract <path|url>` to read
+another copy. The operations table is where the SDK reads which operations are idempotent and
+user-scoped. Commit the output. CI regenerates from the pinned copy and fails on any difference.
+`regenerate.yml` opens a pull request when the docs publish a new contract, and
+`contract-drift.yml` reports daily when the pinned copy falls behind.
+[CONTRIBUTING.md](https://github.com/doctronic-ai/doctronic-sdk-python/blob/main/CONTRIBUTING.md) has the details.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/doctronic-ai/doctronic-sdk-python/blob/main/LICENSE).

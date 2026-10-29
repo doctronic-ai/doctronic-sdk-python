@@ -14,9 +14,10 @@ Built from the same contract as 0.1.0 (`info.version` 0.1.0, 22 operations).
     anything else as unknown. This applies to every enum in `doctronic.types`, including
     `Scope`, `Role`, `Sex`, and `State`.
   - Data that doesn't match the contract, such as a missing field or a value of another type, is
-    returned instead of raised. Fields that match are typed as usual, the others are kept as the
-    API sent them, and missing ones are `None`. The SDK logs a warning on the `doctronic` logger
-    that names the request ID and the fields, never their values.
+    returned instead of raised. Fields that match are typed as usual, and the others are kept as
+    the API sent them. Missing required fields are `None`; optional fields keep their defaults.
+    The SDK logs a warning on the `doctronic` logger that names the request ID and the fields,
+    never their values.
   - `APIResponseValidationError` now means the SDK can't use the response at all: the body isn't
     JSON, `data` is missing or `null` for an operation that returns data, or a `200` stream isn't
     `text/event-stream`.
@@ -50,11 +51,18 @@ Built from the same contract as 0.1.0 (`info.version` 0.1.0, 22 operations).
   labeled `breaking-change` when the docs flag one.
 - `contract-drift.yml`: a daily job that reports when the pinned contract falls behind the
   published one. It isn't a required check.
+- README sections on versioning and support, and a link to the TypeScript SDK.
+- `CONTRIBUTING.md`, a code of conduct (Contributor Covenant 2.1), issue and pull request
+  templates that warn against posting tokens or patient data, and `CODEOWNERS`.
 - Each release gets a GitHub Release with its CHANGELOG entry as the notes. The release workflow
   stops before publishing when the CHANGELOG has no entry for the version.
 
 ### Fixed
 
+- The README's links to `examples/quickstart.py` and `LICENSE` were relative and broke on PyPI;
+  every link in the README is absolute now. Its webhook example imports what it uses.
+- `examples/quickstart.py` no longer reads `DOCTRONIC_API_URL`, which the SDK never reads. Pass
+  `base_url=` to point the client somewhere else.
 - Building from the sdist accepts any hatchling from 1.27 (the first with PEP 639 license
   metadata) up to 2, instead of exactly 1.32.4.
 - The sdist no longer includes the repository's `.gitignore`.

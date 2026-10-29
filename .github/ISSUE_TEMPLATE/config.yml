@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Doctronic API documentation
+    url: https://docs.doctronic.ai
+    about: Guides, the API reference, errors, and webhooks. Questions about the API itself, or your access, start here.
+  - name: Report a security vulnerability
+    url: https://github.com/doctronic-ai/doctronic-sdk-python/security/advisories/new
+    about: Report vulnerabilities privately here, never in a public issue.
