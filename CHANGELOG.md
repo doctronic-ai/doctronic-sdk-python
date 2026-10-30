@@ -28,9 +28,10 @@ publish the chat stream's event schemas and the webhook payloads.
     `GuardianCategory | str` and defaults to `"other"`; `ends_conversation` defaults to `False`.
     A `guardian` event whose `endsConversation` or `category` is missing or `null` is a
     `GuardianEvent` with those defaults, never `UnknownChatStreamEvent`, as in the TypeScript SDK.
-    A wrong value of another type, such as a `category` that isn't a string, or a missing
-    `guardianId` makes it `UnknownChatStreamEvent`. `message` defaults to `""`, so a `guardian`
-    event without it is no longer `UnknownChatStreamEvent`. `guardian_id` is typed
+    A value of another type in either one, such as a `category` that isn't a string, now makes it
+    `UnknownChatStreamEvent`; before, any value was kept in `model_extra`. A missing `guardianId`
+    still does. `message` defaults to `""`, so a `guardian` event without it is no longer
+    `UnknownChatStreamEvent`. `guardian_id` is typed
     `PartnerGuardianId | str`; its value is still the string the API sent, so compare it with the
     `PartnerGuardianId` members you handle.
   - `SkillCodeCtaEvent.widget` is `str | None` and defaults to `None`. Before, a `skill_code.cta`
