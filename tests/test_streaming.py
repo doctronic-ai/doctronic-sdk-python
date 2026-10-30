@@ -318,6 +318,33 @@ def test_guardian_event_without_the_optional_fields_gets_the_contract_defaults()
     assert event.category == GuardianCategory.other
 
 
+@pytest.mark.parametrize(
+    "missing",
+    [("endsConversation",), ("category",), ("endsConversation", "category")],
+    ids=["no-ends-conversation", "no-category", "neither"],
+)
+def test_guardian_event_missing_fields_is_never_demoted_to_unknown(
+    missing: tuple[str, ...],
+) -> None:
+    # A safety signal: integrators skip unknown events, so it stays a typed `GuardianEvent` with
+    # the contract's defaults, as the TypeScript SDK delivers it.
+    payload: dict[str, Any] = {
+        "type": "guardian",
+        "guardianId": "emergency_breathing",
+        "message": "Please call emergency services now.",
+        "endsConversation": True,
+        "category": "emergency",
+    }
+    for name in missing:
+        del payload[name]
+
+    event = parse_event(frame(payload))
+
+    assert isinstance(event, GuardianEvent)
+    assert event.ends_conversation is ("endsConversation" not in missing)
+    assert event.category == ("other" if "category" in missing else "emergency")
+
+
 def test_consultation_complete_with_null_artifacts() -> None:
     event = parse_event(frame(COMPLETE_WITH_NULLS))
 
