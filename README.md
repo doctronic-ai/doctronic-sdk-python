@@ -225,7 +225,9 @@ exports each one under the name below and under its contract name, such as
   don't use yet.
 - **Guardian IDs and categories are open.** `guardian_id` and `category` arrive as the strings the
   API sent. Compare them with the `PartnerGuardianId` and `GuardianCategory` members you handle,
-  and treat any other value as new rather than ignoring the event.
+  and treat any other value as new rather than ignoring the event. A `guardian` event that omits
+  `endsConversation` or `category`, or sends `null`, still arrives as a `GuardianEvent`, with
+  `ends_conversation=False` and `category="other"`.
 - **An `error` event is yielded, not raised.** Handle it apart from message text.
 - **Errors before the stream starts raise:** `ConflictError` for
   `error.partner.chat_stream_in_progress`, `ServiceUnavailableError` for

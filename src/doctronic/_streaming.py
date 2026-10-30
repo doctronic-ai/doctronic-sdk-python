@@ -139,6 +139,12 @@ ChatStreamEvent: TypeAlias = KnownChatStreamEvent | UnknownChatStreamEvent
 """A chat stream event. Narrow it with `isinstance`; new event types are `UnknownChatStreamEvent`."""
 
 
+_NULL_IS_DEFAULT: dict[str, tuple[str, ...]] = {"guardian": ("endsConversation", "category")}
+"""Fields that read as their contract default when the stream sends `null`, as in the TypeScript
+SDK. A `guardian` event is a safety signal, so it must not become an unknown event, which
+integrators skip, over a `null` the contract's default covers."""
+
+
 def parse_event(frame: SSEFrame) -> ChatStreamEvent:
     """Turn a frame into a typed event. Never raises: anything unrecognized is unknown."""
     try:
@@ -151,8 +157,12 @@ def parse_event(frame: SSEFrame) -> ChatStreamEvent:
     model = STREAM_EVENTS.get(name)
     if model is None or not isinstance(payload, dict):
         return UnknownChatStreamEvent(type=name, data=payload)
+    fields = {**payload, "type": name}
+    for key in _NULL_IS_DEFAULT.get(name, ()):
+        if key in fields and fields[key] is None:
+            del fields[key]
     try:
-        return cast("ChatStreamEvent", model.model_validate({**payload, "type": name}))
+        return cast("ChatStreamEvent", model.model_validate(fields))
     except pydantic.ValidationError:
         return UnknownChatStreamEvent(type=name, data=payload)
 

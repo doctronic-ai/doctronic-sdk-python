@@ -26,10 +26,13 @@ publish the chat stream's event schemas and the webhook payloads.
   - `GuardianEvent` has typed `title`, `text`, `ends_conversation`, and `category` fields. Before,
     they were only in `model_extra`, under their camelCase names. `category` is
     `GuardianCategory | str` and defaults to `"other"`; `ends_conversation` defaults to `False`.
-    A `guardian` event without `endsConversation` or `category` is a `GuardianEvent` with those
-    defaults, never `UnknownChatStreamEvent`, as in the TypeScript SDK. `message` defaults to
-    `""`, so a `guardian` event without it is no longer `UnknownChatStreamEvent` either. `guardian_id` is typed `PartnerGuardianId | str`; its value is still
-    the string the API sent, so compare it with the `PartnerGuardianId` members you handle.
+    A `guardian` event whose `endsConversation` or `category` is missing or `null` is a
+    `GuardianEvent` with those defaults, never `UnknownChatStreamEvent`, as in the TypeScript SDK.
+    A wrong value of another type, such as a `category` that isn't a string, or a missing
+    `guardianId` makes it `UnknownChatStreamEvent`. `message` defaults to `""`, so a `guardian`
+    event without it is no longer `UnknownChatStreamEvent`. `guardian_id` is typed
+    `PartnerGuardianId | str`; its value is still the string the API sent, so compare it with the
+    `PartnerGuardianId` members you handle.
   - `SkillCodeCtaEvent.widget` is `str | None` and defaults to `None`. Before, a `skill_code.cta`
     event without `widget` became `UnknownChatStreamEvent`.
   - `ArtifactReadyData.artifact_type` is the open enum `ArtifactType` instead of `str`. It still

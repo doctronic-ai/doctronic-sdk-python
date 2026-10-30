@@ -318,31 +318,68 @@ def test_guardian_event_without_the_optional_fields_gets_the_contract_defaults()
     assert event.category == GuardianCategory.other
 
 
+GUARDIAN = {
+    "type": "guardian",
+    "guardianId": "emergency_breathing",
+    "message": "Please call emergency services now.",
+    "endsConversation": True,
+    "category": "emergency",
+}
+
+
+@pytest.mark.parametrize("absent", ["missing", "null"])
 @pytest.mark.parametrize(
-    "missing",
+    "fields",
     [("endsConversation",), ("category",), ("endsConversation", "category")],
-    ids=["no-ends-conversation", "no-category", "neither"],
+    ids=["ends-conversation", "category", "both"],
 )
-def test_guardian_event_missing_fields_is_never_demoted_to_unknown(
-    missing: tuple[str, ...],
+def test_guardian_event_without_ends_conversation_or_category_stays_typed(
+    fields: tuple[str, ...], absent: str
 ) -> None:
-    # A safety signal: integrators skip unknown events, so it stays a typed `GuardianEvent` with
-    # the contract's defaults, as the TypeScript SDK delivers it.
-    payload: dict[str, Any] = {
-        "type": "guardian",
-        "guardianId": "emergency_breathing",
-        "message": "Please call emergency services now.",
-        "endsConversation": True,
-        "category": "emergency",
-    }
-    for name in missing:
-        del payload[name]
+    # A safety signal: integrators skip unknown events, so a missing or `null` field reads as the
+    # contract's default and the event stays a typed `GuardianEvent`, as in the TypeScript SDK.
+    payload: dict[str, Any] = dict(GUARDIAN)
+    for name in fields:
+        if absent == "missing":
+            del payload[name]
+        else:
+            payload[name] = None
 
     event = parse_event(frame(payload))
 
     assert isinstance(event, GuardianEvent)
-    assert event.ends_conversation is ("endsConversation" not in missing)
-    assert event.category == ("other" if "category" in missing else "emergency")
+    assert event.ends_conversation is ("endsConversation" not in fields)
+    assert event.category == ("other" if "category" in fields else "emergency")
+
+
+def test_guardian_event_without_a_message_reads_it_as_empty() -> None:
+    payload = {key: value for key, value in GUARDIAN.items() if key != "message"}
+
+    event = parse_event(frame(payload))
+
+    assert isinstance(event, GuardianEvent)
+    assert event.message == ""
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"endsConversation": "maybe"},
+        {"category": 5},
+        {"guardianId": None},
+    ],
+    ids=["wrong-ends-conversation", "wrong-category", "null-guardian-id"],
+)
+def test_guardian_event_with_wrong_values_is_unknown(change: dict[str, Any]) -> None:
+    payload = {**GUARDIAN, **change}
+
+    assert parse_event(frame(payload)) == UnknownChatStreamEvent(type="guardian", data=payload)
+
+
+def test_guardian_event_without_a_guardian_id_is_unknown() -> None:
+    payload = {key: value for key, value in GUARDIAN.items() if key != "guardianId"}
+
+    assert parse_event(frame(payload)) == UnknownChatStreamEvent(type="guardian", data=payload)
 
 
 def test_consultation_complete_with_null_artifacts() -> None:
@@ -499,14 +536,17 @@ async def test_final_messages_marks_messages_cut_off(
 @pytest.mark.asyncio
 async def test_contract_events_through_the_client(client: AnyClient, api: respx.MockRouter) -> None:
     future: dict[str, Any] = {"type": "conversation.handoff", "to": "clinician"}
-    mock_stream(api, [sse(GUARDIAN_NEW_ID, COMPLETE_WITH_NULLS, future)])
+    nulls = {**GUARDIAN, "endsConversation": None, "category": None}
+    mock_stream(api, [sse(GUARDIAN_NEW_ID, nulls, COMPLETE_WITH_NULLS, future)])
     stream = await open_stream(client.for_user(USER_ID).chats.stream("chat_01", user_input="Hi"))
 
     final = await resolve(stream.final_messages())
 
-    guardian, complete, unknown = final.control_events
+    guardian, guardian_with_nulls, complete, unknown = final.control_events
     assert isinstance(guardian, GuardianEvent)
     assert (guardian.guardian_id, guardian.category) == ("brand_new_detector", "brand_new_category")
+    assert isinstance(guardian_with_nulls, GuardianEvent)
+    assert (guardian_with_nulls.ends_conversation, guardian_with_nulls.category) == (False, "other")
     assert isinstance(complete, AiConsultationCompleteEvent)
     assert complete.artifacts.short_summary is None
     assert unknown == UnknownChatStreamEvent(type="conversation.handoff", data=future)
