@@ -1,16 +1,18 @@
-"""`scripts/generate.py`: which operations it covers, what it prunes, and the 409 facts."""
+"""`scripts/generate.py`: which operations it covers, what it prunes, the 409 facts, and events."""
 
 from __future__ import annotations
 
 import ast
 import copy
+import json
 import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from doctronic._generated.operations import OPERATIONS
+from doctronic._generated.events import STREAM_EVENTS, WEBHOOK_EVENTS
+from doctronic._generated.operations import CONTRACT_VERSION, OPERATIONS
 from tests.helpers import ROOT, load_generator, load_script, pinned_contract
 
 generate = load_generator()
@@ -82,6 +84,7 @@ def with_retryable_codes(contract: dict[str, Any], *, extension: object) -> dict
             ("busy", CONCURRENT),
         ]
     }
+    conflict.pop("x-doctronic-retryable-codes", None)
     if extension is not None:
         conflict["x-doctronic-retryable-codes"] = extension
     return contract
@@ -107,13 +110,18 @@ def test_the_pinned_contract_gives_the_committed_operations() -> None:
 
 def test_the_pinned_contract_is_the_default() -> None:
     assert Path(generate.PINNED_CONTRACT) == ROOT / "openapi" / "doctronic-v1.json"
-    assert generate.skipped_operations(pinned_contract()) == []
+    assert pinned_contract()["info"]["version"] == CONTRACT_VERSION
+    # The embed operations take a browser session token, not the organization API token.
+    skipped = generate.skipped_operations(pinned_contract())
+    assert skipped
+    assert all(path.startswith("/embed/") for _, path in skipped)
 
 
 def test_operations_without_organization_security_are_skipped() -> None:
     contract = with_browser_operations(pinned_contract())
 
     assert generate.skipped_operations(contract) == [
+        *generate.skipped_operations(pinned_contract()),
         ("GET", "/browser/config/"),
         ("POST", "/browser/chats/{chatId}/rating/"),
     ]
@@ -132,7 +140,7 @@ def test_schemas_only_skipped_operations_use_are_pruned() -> None:
     assert "UnusedByAnyOperation" in schemas  # No operation uses it, so it isn't pruned.
     assert "/browser/config/" not in pruned["paths"]
     assert pruned["components"]["schemas"].keys() == {
-        *pinned_contract()["components"]["schemas"],
+        *generate.organization_contract(pinned_contract())["components"]["schemas"],
         "UnusedByAnyOperation",
     }
     assert "/browser/config/" in contract["paths"]  # The input isn't modified.
@@ -216,3 +224,125 @@ def test_change_report_for_the_same_contract() -> None:
 
     assert counts == {"added": 0, "removed": 0, "modified": 0}
     assert "No operations were added, removed, or changed." in lines
+
+
+STREAM = ("/chats/{chatId}/stream/", "post", "200", "text/event-stream")
+
+
+def stream_media(contract: dict[str, Any]) -> dict[str, Any]:
+    path, method, status, media_type = STREAM
+    media: dict[str, Any] = contract["paths"][path][method]["responses"][status]["content"][
+        media_type
+    ]
+    return media
+
+
+def test_the_events_table_is_the_pinned_contract_events() -> None:
+    contract = generate.organization_contract(pinned_contract())
+
+    stream = generate.stream_events(contract)
+    webhooks = generate.webhook_events(contract)
+
+    assert [(name, model.__name__) for name, model in STREAM_EVENTS.items()] == stream
+    assert [(name, model.__name__) for name, model in WEBHOOK_EVENTS.items()] == webhooks
+    assert set(STREAM_EVENTS) == {
+        "message.start",
+        "message.content",
+        "message.stop",
+        "guardian",
+        "skill_code.cta",
+        "ai_consultation.complete",
+        "conversation.offtopic",
+        "conversation.end",
+        "error",
+    }
+    assert set(WEBHOOK_EVENTS) == {
+        "appointment.call_ended",
+        "appointment.practitioner_joined",
+        "appointment.waiting_room_ready",
+        "artifact.ready",
+    }
+
+
+def test_schemas_the_webhooks_use_are_kept() -> None:
+    contract = with_browser_operations(pinned_contract())
+    # A skipped operation shares a webhook's schema; the webhook keeps it in the models.
+    theme = contract["components"]["schemas"]["BrowserTheme"]
+    theme["properties"]["artifact"] = {"$ref": "#/components/schemas/ArtifactReadyData"}
+
+    pruned = generate.organization_contract(contract)
+
+    assert "BrowserTheme" not in pruned["components"]["schemas"]
+    assert "ArtifactReadyData" in pruned["components"]["schemas"]
+    assert generate.webhook_events(pruned) == generate.webhook_events(contract)
+
+
+def without_event_schema(contract: dict[str, Any]) -> None:
+    del stream_media(contract)["x-doctronic-event-schema"]
+
+
+def without_webhooks(contract: dict[str, Any]) -> None:
+    del contract["webhooks"]
+
+
+def with_empty_webhooks(contract: dict[str, Any]) -> None:
+    contract["webhooks"] = {}
+
+
+def with_inline_event_schema(contract: dict[str, Any]) -> None:
+    stream_media(contract)["x-doctronic-event-schema"] = {"type": "object"}
+
+
+def with_mismatched_event_type(contract: dict[str, Any]) -> None:
+    event = contract["components"]["schemas"]["StreamChatGuardianEvent"]
+    event["properties"]["type"]["const"] = "guardian.v2"
+
+
+def with_undiscriminated_events(contract: dict[str, Any]) -> None:
+    del contract["components"]["schemas"]["StreamChatEvent"]["discriminator"]
+
+
+def without_signature_header(contract: dict[str, Any]) -> None:
+    contract["webhooks"]["artifact.ready"]["post"]["parameters"] = []
+
+
+def without_required_occurred_at(contract: dict[str, Any]) -> None:
+    payload = contract["components"]["schemas"]["ArtifactReadyPayload"]
+    payload["required"] = [name for name in payload["required"] if name != "occurredAt"]
+
+
+def with_mismatched_webhook_event(contract: dict[str, Any]) -> None:
+    payload = contract["components"]["schemas"]["ArtifactReadyPayload"]
+    payload["properties"]["event"]["const"] = "artifact.created"
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (without_event_schema, "has no `x-doctronic-event-schema`"),
+        (with_inline_event_schema, r"must be a `\$ref`"),
+        (with_undiscriminated_events, "discriminator"),
+        (with_mismatched_event_type, "'guardian'"),
+        (without_webhooks, "no `webhooks`"),
+        (with_empty_webhooks, "no `webhooks`"),
+        (without_signature_header, "X-Doctronic-Signature"),
+        (without_required_occurred_at, "occurredAt"),
+        (with_mismatched_webhook_event, "'artifact.ready'"),
+    ],
+    ids=lambda value: getattr(value, "__name__", ""),
+)
+def test_a_contract_without_the_event_models_fails_loudly(
+    change: Any, message: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    contract = pinned_contract()
+    change(contract)
+    source = tmp_path / "contract.json"
+    source.write_text(json.dumps(contract), encoding="utf-8")
+    output = tmp_path / "_generated"
+    monkeypatch.setattr(generate, "OUTPUT_DIR", output)
+    monkeypatch.setattr(sys, "argv", ["generate.py", "--contract", str(source)])
+
+    with pytest.raises(SystemExit, match=message):
+        generate.main()
+
+    assert not output.exists()  # Nothing written, so the previous output stays.

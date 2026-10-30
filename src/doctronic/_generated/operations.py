@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
-CONTRACT_VERSION: Final = "0.1.0"
+CONTRACT_VERSION: Final = "1.0.0"
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         stream=False,
         data_required=True,
         statuses=frozenset({201, 400, 401, 403, 409, 422, 503}),
-        conflict_codes=frozenset(),
+        conflict_codes=frozenset({"error.idempotency.payload_mismatch"}),
     ),
     ("PATCH", "/users/"): Operation(
         operation_id="partners_api_users_update_users__patch",
@@ -53,7 +53,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         stream=False,
         data_required=True,
         statuses=frozenset({200, 400, 401, 403, 404, 409, 422, 503}),
-        conflict_codes=frozenset(),
+        conflict_codes=frozenset({"error.idempotency.payload_mismatch"}),
     ),
     ("GET", "/chats/"): Operation(
         operation_id="partners_api_chats_list_chats__get",
@@ -74,8 +74,8 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         user_scoped=True,
         stream=False,
         data_required=True,
-        statuses=frozenset({201, 400, 401, 403, 404, 409, 422, 503}),
-        conflict_codes=frozenset(),
+        statuses=frozenset({201, 400, 401, 403, 404, 409, 422, 429, 503}),
+        conflict_codes=frozenset({"error.idempotency.payload_mismatch"}),
     ),
     ("GET", "/chats/{chatId}/"): Operation(
         operation_id="partners_api_chats_get_chats__chatId___get",
@@ -85,7 +85,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         user_scoped=True,
         stream=False,
         data_required=True,
-        statuses=frozenset({200, 400, 401, 403, 404, 422}),
+        statuses=frozenset({200, 400, 401, 403, 404, 422, 429}),
         conflict_codes=frozenset(),
     ),
     ("GET", "/chats/{chatId}/messages/"): Operation(
@@ -96,7 +96,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         user_scoped=True,
         stream=False,
         data_required=True,
-        statuses=frozenset({200, 400, 401, 403, 404, 422}),
+        statuses=frozenset({200, 400, 401, 403, 404, 422, 429}),
         conflict_codes=frozenset(),
     ),
     ("POST", "/chats/{chatId}/stream/"): Operation(
@@ -107,7 +107,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         user_scoped=True,
         stream=True,
         data_required=False,
-        statuses=frozenset({200, 400, 401, 403, 404, 409, 422, 503}),
+        statuses=frozenset({200, 400, 401, 403, 404, 409, 422, 429, 503}),
         conflict_codes=frozenset({"error.partner.chat_stream_in_progress"}),
     ),
     ("GET", "/appointments/scheduled/available-slots/"): Operation(
@@ -130,7 +130,9 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         stream=False,
         data_required=True,
         statuses=frozenset({201, 400, 401, 403, 404, 409, 422, 502, 503}),
-        conflict_codes=frozenset({"error.appointments.slot_unavailable"}),
+        conflict_codes=frozenset(
+            {"error.appointments.slot_unavailable", "error.idempotency.payload_mismatch"}
+        ),
     ),
     ("POST", "/appointments/asap/"): Operation(
         operation_id="partners_api_appointments_create_asap_appointments_asap__post",
@@ -141,7 +143,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         stream=False,
         data_required=True,
         statuses=frozenset({201, 400, 401, 403, 404, 409, 422, 502, 503}),
-        conflict_codes=frozenset(),
+        conflict_codes=frozenset({"error.idempotency.payload_mismatch"}),
     ),
     ("GET", "/appointments/"): Operation(
         operation_id="partners_api_appointments_list_appointments__get",
@@ -185,7 +187,12 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         stream=False,
         data_required=False,
         statuses=frozenset({200, 400, 401, 403, 404, 409, 422, 503}),
-        conflict_codes=frozenset({"error.appointments.cannot_be_cancelled_or_rescheduled"}),
+        conflict_codes=frozenset(
+            {
+                "error.appointments.cannot_be_cancelled_or_rescheduled",
+                "error.idempotency.payload_mismatch",
+            }
+        ),
     ),
     ("POST", "/appointments/{appointment_id}/reschedule/"): Operation(
         operation_id="partners_api_appointments_reschedule_appointments__appointment_id__reschedule__post",
@@ -200,6 +207,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
             {
                 "error.appointments.cannot_be_cancelled_or_rescheduled",
                 "error.appointments.unavailable_time",
+                "error.idempotency.payload_mismatch",
             }
         ),
     ),
@@ -223,7 +231,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         stream=False,
         data_required=False,
         statuses=frozenset({200, 400, 401, 403, 409, 422, 503}),
-        conflict_codes=frozenset(),
+        conflict_codes=frozenset({"error.idempotency.payload_mismatch"}),
     ),
     ("POST", "/pharmacy/search/"): Operation(
         operation_id="partners_api_pharmacy_search_pharmacy_search__post",
@@ -234,7 +242,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         stream=False,
         data_required=True,
         statuses=frozenset({200, 400, 401, 403, 409, 422, 503}),
-        conflict_codes=frozenset(),
+        conflict_codes=frozenset({"error.idempotency.payload_mismatch"}),
     ),
     ("PUT", "/pharmacy/"): Operation(
         operation_id="partners_api_pharmacy_set_pharmacy__put",
@@ -245,7 +253,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         stream=False,
         data_required=False,
         statuses=frozenset({200, 400, 401, 403, 404, 409, 422, 503}),
-        conflict_codes=frozenset(),
+        conflict_codes=frozenset({"error.idempotency.payload_mismatch"}),
     ),
     ("PUT", "/coverage/"): Operation(
         operation_id="partners_api_coverage_set_coverage__put",
@@ -256,7 +264,7 @@ OPERATIONS: Final[dict[tuple[str, str], Operation]] = {
         stream=False,
         data_required=False,
         statuses=frozenset({200, 400, 401, 403, 404, 409, 422, 503}),
-        conflict_codes=frozenset(),
+        conflict_codes=frozenset({"error.idempotency.payload_mismatch"}),
     ),
     ("GET", "/artifacts/{artifactId}/"): Operation(
         operation_id="partners_api_get_artifact_artifacts__artifactId___get",

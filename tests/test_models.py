@@ -65,6 +65,7 @@ def test_operations_table_matches_the_contract_shape() -> None:
     assert OPERATIONS[("POST", "/appointments/{appointment_id}/reschedule/")].conflict_codes == {
         "error.appointments.cannot_be_cancelled_or_rescheduled",
         "error.appointments.unavailable_time",
+        "error.idempotency.payload_mismatch",
     }
 
 

@@ -1,5 +1,70 @@
 # Changelog
 
+## Unreleased
+
+A minor release. Built from the contract with `info.version` 1.0.0 (22 operations), the first to
+publish the chat stream's event schemas and the webhook payloads.
+
+### Changed
+
+- **Chat stream events and webhook payloads are generated from the contract.** Until now they
+  were written by hand. The stream events come from `StreamChatEvent`, the union the stream's
+  `x-doctronic-event-schema` names, and the webhook payloads from the contract's `webhooks`.
+  Every name `doctronic.types` exported before is still there, as the generated class, and the
+  rules for new values stay: an unknown event type is still `UnknownChatStreamEvent`, an unknown
+  webhook event is still `UnknownWebhookEvent`, and enums still accept values this version doesn't
+  list. Where the contract differs from the hand-written models, the SDK now follows the contract,
+  which describes what the API sends:
+  - `MessageStartEvent.role` is an open enum of `"assistant"` and `"user"` instead of `str`, like
+    `ChatMessage.role`. It still equals the string. `str()` and f-strings give the member's name,
+    so use `role.value` for the plain string. A `message.start` without `role` now reads as
+    `"assistant"`, the contract's default, instead of becoming `UnknownChatStreamEvent`.
+    `StreamedMessage.role` from `final_messages()` stays a plain `str`.
+  - `MessageStartEvent.message_timestamp` and `StreamErrorEvent.retry_after_seconds` are
+    `int | None` instead of `int | float | None`. A whole-number float still parses; a fractional
+    one makes the event `UnknownChatStreamEvent`.
+  - `GuardianEvent` has typed `title`, `text`, `ends_conversation`, and `category` fields. Before,
+    they were only in `model_extra`, under their camelCase names. `category` is
+    `GuardianCategory | str` and defaults to `"other"`; `ends_conversation` defaults to `False`.
+    A `guardian` event whose `endsConversation` or `category` is missing or `null` is a
+    `GuardianEvent` with those defaults, never `UnknownChatStreamEvent`, as in the TypeScript SDK.
+    A value of another type in either one, such as a `category` that isn't a string, now makes it
+    `UnknownChatStreamEvent`; before, any value was kept in `model_extra`. A missing `guardianId`
+    still does. `message` defaults to `""`, so a `guardian` event without it is no longer
+    `UnknownChatStreamEvent`. `guardian_id` is typed
+    `PartnerGuardianId | str`; its value is still the string the API sent, so compare it with the
+    `PartnerGuardianId` members you handle.
+  - `SkillCodeCtaEvent.widget` is `str | None` and defaults to `None`. Before, a `skill_code.cta`
+    event without `widget` became `UnknownChatStreamEvent`.
+  - `ArtifactReadyData.artifact_type` is the open enum `ArtifactType` instead of `str`. It still
+    equals the string.
+  - `AppointmentWaitingRoomReadyData.waiting_room_url` must be 1 to 2,083 characters, as the
+    contract says. Outside that, `verify_webhook()` raises `WebhookVerificationError`.
+  - The webhook classes' `event` field defaults to the event's name, so you can build one in a
+    test without it. Every webhook payload still requires `occurred_at`.
+  - Each class's `__name__` and `repr()` use the contract name, such as
+    `StreamChatMessageStartEvent` for `MessageStartEvent` and `ArtifactReadyPayload` for
+    `ArtifactReadyEvent`, and the docstrings come from the contract.
+- `error.idempotency.payload_mismatch` is final on every operation that takes an idempotency key,
+  because the new contract documents it for each of them. Before, those operations didn't
+  document it, so a `409` with that code was retried with the same key.
+  `error.idempotency.concurrent_request` is still retried.
+- `scripts/generate.py` writes `src/doctronic/_generated/events.py`, which maps each stream event
+  `type` and each webhook `event` to its model. It stops with an error when the contract has no
+  `x-doctronic-event-schema` on the stream or no `webhooks`, so the models can't silently
+  disappear. Required fields keep the defaults the contract declares, which also gives
+  `ValidationErrorResponse.code` and `.message` their defaults.
+
+### Added
+
+- In `doctronic.types`, the contract names of the stream events (`StreamChatEvent`,
+  `StreamChatMessageStartEvent`, `StreamChatMessageContentEvent`, `StreamChatMessageStopEvent`,
+  `StreamChatGuardianEvent`, `StreamChatCTAEvent`, `StreamChatConsultationCompleteEvent`,
+  `StreamChatConversationOfftopicEvent`, `StreamChatConversationEndEvent`,
+  `StreamChatErrorEvent`) and of the webhook payloads (`AppointmentWaitingRoomReadyPayload`,
+  `AppointmentPractitionerJoinedPayload`, `AppointmentCallEndedPayload`, `ArtifactReadyPayload`),
+  and the enums `PartnerGuardianId`, `GuardianCategory`, and `ArtifactType`.
+
 ## 0.1.1 (2026-10-29)
 
 Built from the same contract as 0.1.0 (`info.version` 0.1.0, 22 operations).

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Doctronic API",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "Create users, run streaming clinical conversations, book appointments, and retrieve consultation documents."
   },
   "paths": {
@@ -195,7 +195,33 @@
             }
           },
           "409": {
-            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -209,15 +235,27 @@
             "x-doctronic-legacy-schema-artifact": true
           },
           "503": {
-            "description": "Phone validation is temporarily unavailable. Retry the same request later.",
+            "description": "Phone validation is temporarily unavailable. Retry the same request later. Idempotent request coordination is temporarily unavailable before processing begins.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
-                "example": {
-                  "code": "error.validation.phone_number.unavailable",
-                  "message": "Phone validation is temporarily unavailable. Retry the same request later."
+                "examples": {
+                  "error.validation.phone_number.unavailable": {
+                    "summary": "Phone validation unavailable",
+                    "value": {
+                      "code": "error.validation.phone_number.unavailable",
+                      "message": "Phone validation is temporarily unavailable. Retry the same request later."
+                    }
+                  },
+                  "error.idempotency.unavailable": {
+                    "summary": "Idempotency unavailable",
+                    "value": {
+                      "code": "error.idempotency.unavailable",
+                      "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
+                    }
+                  }
                 }
               }
             },
@@ -376,7 +414,33 @@
             }
           },
           "409": {
-            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -390,15 +454,27 @@
             "x-doctronic-legacy-schema-artifact": true
           },
           "503": {
-            "description": "Phone validation is temporarily unavailable. Retry the same request later.",
+            "description": "Phone validation is temporarily unavailable. Retry the same request later. Idempotent request coordination is temporarily unavailable before processing begins.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
-                "example": {
-                  "code": "error.validation.phone_number.unavailable",
-                  "message": "Phone validation is temporarily unavailable. Retry the same request later."
+                "examples": {
+                  "error.validation.phone_number.unavailable": {
+                    "summary": "Phone validation unavailable",
+                    "value": {
+                      "code": "error.validation.phone_number.unavailable",
+                      "message": "Phone validation is temporarily unavailable. Retry the same request later."
+                    }
+                  },
+                  "error.idempotency.unavailable": {
+                    "summary": "Idempotency unavailable",
+                    "value": {
+                      "code": "error.idempotency.unavailable",
+                      "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
+                    }
+                  }
                 }
               }
             },
@@ -455,6 +531,9 @@
           {
             "HTTPBearer": [],
             "XDoctronicUserID": []
+          },
+          {
+            "EmbedSessionToken": []
           }
         ],
         "requestBody": {
@@ -575,7 +654,33 @@
             }
           },
           "409": {
-            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -588,6 +693,29 @@
             },
             "x-doctronic-legacy-schema-artifact": true
           },
+          "429": {
+            "description": "Too many requests right now. Please wait a moment and try again. Sent for embed session tokens only.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rate_limited",
+                  "message": "Too many requests right now. Please wait a moment and try again.",
+                  "data": {
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
           "503": {
             "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
             "headers": {
@@ -598,6 +726,17 @@
                   "minimum": 0
                 }
               }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unavailable",
+                  "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
+                }
+              }
             }
           }
         },
@@ -606,6 +745,9 @@
           {
             "HTTPBearer": [],
             "XDoctronicUserID": []
+          },
+          {
+            "EmbedSessionToken": []
           }
         ],
         "parameters": [
@@ -790,12 +932,15 @@
           "chats"
         ],
         "summary": "Get a chat",
-        "description": "Fetch a single chat by id.\n\nThe chat must have been created through this Doctronic API and belong to both the\nauthenticated organization and user. A chat that exists but belongs to another organization or\nuser is masked as `404 error.partner.chat_not_found` so callers cannot probe for the\nexistence of chats outside their scope.\n\n**Path parameters**\n- `chatId`: the chat id returned by `POST /chats/`.\n\n**Auth:** organization Bearer token + `X-Doctronic-User-ID` header (both required).",
+        "description": "Fetch a single chat by id.\n\nThe chat must have been created through this Doctronic API and belong to both the\nauthenticated organization and user. A chat that exists but belongs to another organization or\nuser is masked as `404 error.partner.chat_not_found` so callers cannot probe for the\nexistence of chats outside their scope.\n\n**Path parameters**\n- `chatId`: the chat id returned by `POST /chats/`.\n\n**Auth:** organization Bearer token + `X-Doctronic-User-ID` header (both required), or an embed\nsession token from `POST /embed/sessions/` alone (it carries its user, so no user-id header).",
         "operationId": "partners_api_chats_get_chats__chatId___get",
         "security": [
           {
             "HTTPBearer": [],
             "XDoctronicUserID": []
+          },
+          {
+            "EmbedSessionToken": []
           }
         ],
         "parameters": [
@@ -914,6 +1059,29 @@
               }
             },
             "x-doctronic-legacy-schema-artifact": true
+          },
+          "429": {
+            "description": "Too many requests right now. Please wait a moment and try again. Sent for embed session tokens only.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rate_limited",
+                  "message": "Too many requests right now. Please wait a moment and try again.",
+                  "data": {
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
           }
         },
         "x-doctronic-required-scope": "chats:read",
@@ -921,6 +1089,9 @@
           {
             "HTTPBearer": [],
             "XDoctronicUserID": []
+          },
+          {
+            "EmbedSessionToken": []
           }
         ]
       }
@@ -937,6 +1108,9 @@
           {
             "HTTPBearer": [],
             "XDoctronicUserID": []
+          },
+          {
+            "EmbedSessionToken": []
           }
         ],
         "parameters": [
@@ -1098,6 +1272,29 @@
               }
             },
             "x-doctronic-legacy-schema-artifact": true
+          },
+          "429": {
+            "description": "Too many requests right now. Please wait a moment and try again. Sent for embed session tokens only.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rate_limited",
+                  "message": "Too many requests right now. Please wait a moment and try again.",
+                  "data": {
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
           }
         },
         "x-doctronic-required-scope": "chats:read",
@@ -1105,6 +1302,9 @@
           {
             "HTTPBearer": [],
             "XDoctronicUserID": []
+          },
+          {
+            "EmbedSessionToken": []
           }
         ]
       }
@@ -1115,12 +1315,15 @@
           "chats"
         ],
         "summary": "Stream a chat turn (SSE)",
-        "description": "Send a user message to an existing chat and stream the assistant's reply as\nServer-Sent Events.\n\nThe response is `text/event-stream` (not the standard JSON envelope). Each event is a\nframe of the form `event: <type>` followed by a camelCase JSON `data:` payload. The\nconnection stays open for the whole assistant turn and closes when the turn ends.\n\n**Event types** (see the 200 response examples for full payloads):\n- `message.start` / `message.content` / `message.stop`: the assistant message lifecycle\n  and its streamed text chunks.\n- `conversation.offtopic`: the message was classified as off-topic.\n- `conversation.end`: the assistant ended the conversation (`reason` explains why).\n- `guardian`: a safety condition was detected; `guardianId` is stable.\n- `error`: an error; the stream ends after it. `errorCode` is `error.rate_limited`\n  (may include `retryAfterSeconds`), `error.internal` (the reply failed; don't retry the turn automatically: read the transcript, then let the patient resend), or\n  `error.consultation_not_ready` (the consultation could not be finalized; booking is\n  unavailable).\n- `skill_code.cta`: an end-of-flow call to action (e.g. see a Doctronic doctor, or book\n  an in-person visit); carries `skillCode`, `widget`, and an optional `text` label.\n- `ai_consultation.complete`: consultation completion with document IDs. Document retrieval can still return `202` while generation finishes.\n\n**Event compatibility:** Published event names are stable wire identifiers. New event names\nmay be added. A replacement will be introduced additively and the old name explicitly\ndeprecated; published names will not be silently renamed. Consumers should ignore event\nnames they do not recognize.\n\n**Request body**\n- `userEvent`: the user message: `type` `user_message`, `userInput`, and optional\n  `messagePromptContext` (up to 50,000 characters) with situational context for this turn.\n- `timezone`: optional IANA timezone (default `UTC`); an invalid value returns `400`.\n\nThe chat must have been created through this Doctronic API and belong to both the\nauthenticated organization and user; otherwise it is masked as\n`404 error.partner.chat_not_found`.\n\n**Auth:** organization Bearer token + `X-Doctronic-User-ID` header (both required).",
+        "description": "Send a user message to an existing chat and stream the assistant's reply as\nServer-Sent Events.\n\nThe response is `text/event-stream` (not the standard JSON envelope). Each event is a\nframe of the form `event: <type>` followed by a camelCase JSON `data:` payload. The\nconnection stays open for the whole assistant turn and closes when the turn ends.\n\n**Event types** (see the 200 response examples for full payloads):\n- `message.start` / `message.content` / `message.stop`: the assistant message lifecycle\n  and its streamed text chunks.\n- `conversation.offtopic`: the message was classified as off-topic.\n- `conversation.end`: the assistant ended the conversation (`reason` explains why).\n- `guardian`: a safety condition was detected; `guardianId` is stable.\n  `title` and `text` (markdown) are the patient-facing copy: show them when present.\n  `message` is legacy and will be deprecated. Until a guardian has `title` and `text`:\n  for `safety`, show `message`, which is patient-ready; for `emergency`, show your own\n  emergency guidance and never `message`, which is empty or an internal label such as\n  \"🛡️ Guardian stopped\"; for `feedback`, no UI is needed; for `other`, show your own copy.\n  `title` and `text` are optional, so keep your own copy as a fallback.\n  `endsConversation` is true when this guardian ends the conversation: stop input, but keep\n  reading until the `conversation.end` that follows, which confirms it (if the client disconnects\n  first, the chat can stay open). After that, sending a message returns\n  `404 error.partner.chat_not_found`; start a new chat. Decide whether to stop input from\n  `endsConversation`, never from `category`.\n  `category` is `emergency`, `safety`, `feedback` or `other`. New categories may be added; treat\n  unknown values as `other`.\n  The safety gateways that screen each message report the screener that stopped it: an emergency\n  screener as its `emergency_*` ID, a prompt injection as `prompt_injection` (`safety`), an\n  uncommon message as `uncommon_message` (`other`), and any other security check as\n  `security_gateway` (`safety`).\n  A `guardianId` is sent at most once per turn unless a later event changes what to show (it\n  ends the conversation, or brings new copy). Treat a repeated `guardianId` in the same turn as\n  an update: replace the alert you showed for it rather than adding another. It keeps the\n  earlier `title` or `text` when it brings none of its own.\n- `error`: an error; the stream ends after it. `errorCode` is `error.rate_limited`\n  (may include `retryAfterSeconds`), `error.internal` (the reply failed; check the transcript\n  with `GET /chats/{chatId}/messages/` and send a new turn if appropriate), or\n  `error.consultation_not_ready` (the consultation could not be finalized; booking is\n  unavailable). Don't resend a turn automatically after an `error` event: it may already have\n  produced work.\n- `skill_code.cta`: an end-of-flow call to action (e.g. see a Doctronic doctor, or book\n  an in-person visit); carries `skillCode`, `widget`, and an optional `text` label. Embed chats\n  only get Doctronic visit CTAs when their deployment offers Doctronic visits.\n- `ai_consultation.complete`: consultation completion with document IDs. Document retrieval can still return `202` while generation finishes.\n\n**Event compatibility:** Published event names are stable wire identifiers. New event names\nmay be added. A replacement will be introduced additively and the old name explicitly\ndeprecated; published names will not be silently renamed. Consumers should ignore event\nnames they do not recognize.\n\n**Request body**\n- `userEvent`: the user message: `type` `user_message`, `userInput`, and optional\n  `messagePromptContext` (up to 50,000 characters) with situational context for this turn.\n- `timezone`: optional IANA timezone (default `UTC`); an invalid value returns `400`.\n\nThe chat must have been created through this Doctronic API and belong to both the\nauthenticated organization and user; otherwise it is masked as\n`404 error.partner.chat_not_found`. A chat that has ended (for example after a guardian with\n`endsConversation: true`) also returns `404 error.partner.chat_not_found`.\n\n**Auth:** organization Bearer token + `X-Doctronic-User-ID` header (both required), or an embed\nsession token from `POST /embed/sessions/` alone (it carries its user, so no user-id header).\nWhile the embed deployment is paused, embed requests answer `503 error.embed.paused`, and an open\nembed stream ends with an `error` event whose `errorCode` is `error.embed.paused`.",
         "operationId": "partners_api_chats_stream_chats__chatId__stream__post",
         "security": [
           {
             "HTTPBearer": [],
             "XDoctronicUserID": []
+          },
+          {
+            "EmbedSessionToken": []
           }
         ],
         "parameters": [
@@ -1173,15 +1376,19 @@
                     "value": "event: conversation.offtopic\ndata: {\"type\":\"conversation.offtopic\",\"messageId\":\"ac_hist_01K6JGGM2G2DB4Y9KB9H9MJJ6Q\"}\n\n"
                   },
                   "guardian": {
-                    "summary": "Safety guardian signal",
-                    "value": "event: guardian\ndata: {\"type\":\"guardian\",\"guardianId\":\"emergency_breathing\",\"message\":\"Please call emergency services now.\"}\n\n"
+                    "summary": "Safety guardian that ends the conversation",
+                    "value": "event: guardian\ndata: {\"type\":\"guardian\",\"guardianId\":\"harmful_content_detector\",\"message\":\"I understand you have a question, but I'm not able to help with that topic. I'm here to support your health and wellbeing. If you have a medical concern or health question, I'm happy to help with that instead.\",\"endsConversation\":true,\"category\":\"safety\"}\n\n"
+                  },
+                  "guardian_emergency": {
+                    "summary": "Emergency guardian (the conversation continues)",
+                    "value": "event: guardian\ndata: {\"type\":\"guardian\",\"guardianId\":\"check_emergency_phrase\",\"message\":\"\",\"endsConversation\":false,\"category\":\"emergency\"}\n\n"
                   },
                   "error": {
                     "summary": "Recoverable error (rate limited)",
                     "value": "event: error\ndata: {\"type\":\"error\",\"errorCode\":\"error.rate_limited\",\"message\":\"The service is busy right now. Please retry in a few moments.\",\"retryAfterSeconds\":7}\n\n"
                   },
                   "error_internal": {
-                    "summary": "Internal error (don't retry the turn automatically)",
+                    "summary": "Internal error (the reply failed)",
                     "value": "event: error\ndata: {\"type\":\"error\",\"errorCode\":\"error.internal\",\"message\":\"Something went wrong generating the response. Please retry.\"}\n\n"
                   },
                   "skill_code.cta": {
@@ -1192,6 +1399,9 @@
                     "summary": "Consultation complete with document IDs",
                     "value": "event: ai_consultation.complete\ndata: {\"type\":\"ai_consultation.complete\",\"artifacts\":{\"longSummary\":\"art_01K6JGGM2G2DB4Y9KB9H9MJJ6Q\",\"shortSummary\":\"art_01K6JGGP7Q4R8S2T5V7W9X1Y3\",\"soapNote\":\"art_01K6JGGR9Z6B2C4D6F8H0J2K4M\"}}\n\n"
                   }
+                },
+                "x-doctronic-event-schema": {
+                  "$ref": "#/components/schemas/StreamChatEvent"
                 }
               }
             }
@@ -1318,6 +1528,29 @@
             },
             "x-doctronic-legacy-schema-artifact": true
           },
+          "429": {
+            "description": "Too many requests right now. Please wait a moment and try again. Sent for embed session tokens only.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rate_limited",
+                  "message": "Too many requests right now. Please wait a moment and try again.",
+                  "data": {
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
           "503": {
             "description": "Chat streaming is temporarily unavailable. Please retry shortly.",
             "content": {
@@ -1338,6 +1571,9 @@
           {
             "HTTPBearer": [],
             "XDoctronicUserID": []
+          },
+          {
+            "EmbedSessionToken": []
           }
         ]
       }
@@ -1636,12 +1872,34 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 },
-                "example": {
-                  "code": "error.appointments.slot_unavailable",
-                  "message": "The selected slot is no longer available."
+                "examples": {
+                  "error.appointments.slot_unavailable": {
+                    "summary": "Slot unavailable",
+                    "value": {
+                      "code": "error.appointments.slot_unavailable",
+                      "message": "The selected slot is no longer available."
+                    }
+                  },
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
                 }
               }
-            }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -1676,6 +1934,17 @@
                 "schema": {
                   "type": "integer",
                   "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unavailable",
+                  "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
                 }
               }
             }
@@ -1844,7 +2113,33 @@
             }
           },
           "409": {
-            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -1895,6 +2190,17 @@
                 "schema": {
                   "type": "integer",
                   "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unavailable",
+                  "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
                 }
               }
             }
@@ -2499,15 +2805,37 @@
             "description": "Appointment cannot be cancelled or rescheduled. Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
             "content": {
               "application/json": {
-                "example": {
-                  "code": "error.appointments.cannot_be_cancelled_or_rescheduled",
-                  "message": "Appointment cannot be cancelled or rescheduled."
-                },
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.appointments.cannot_be_cancelled_or_rescheduled": {
+                    "summary": "Appointment cannot be cancelled or rescheduled",
+                    "value": {
+                      "code": "error.appointments.cannot_be_cancelled_or_rescheduled",
+                      "message": "Appointment cannot be cancelled or rescheduled."
+                    }
+                  },
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
                 }
               }
-            }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -2528,6 +2856,17 @@
                 "schema": {
                   "type": "integer",
                   "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unavailable",
+                  "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
                 }
               }
             }
@@ -2686,6 +3025,9 @@
             "description": "Appointment cannot be cancelled or rescheduled. / Timeslot unavailable. Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
             "content": {
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
                 "examples": {
                   "error.appointments.cannot_be_cancelled_or_rescheduled": {
                     "summary": "Appointment cannot be cancelled or rescheduled",
@@ -2700,13 +3042,27 @@
                       "code": "error.appointments.unavailable_time",
                       "message": "Timeslot unavailable."
                     }
+                  },
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
                   }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -2727,6 +3083,17 @@
                 "schema": {
                   "type": "integer",
                   "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unavailable",
+                  "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
                 }
               }
             }
@@ -2868,16 +3235,8 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {},
-                "examples": {
-                  "success": {
-                    "summary": "Actual success response",
-                    "value": {
-                      "code": "success",
-                      "message": "Request successful",
-                      "data": null
-                    }
-                  }
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessfulEmptyResponse"
                 }
               }
             },
@@ -2889,30 +3248,6 @@
                   "enum": [
                     "true"
                   ]
-                }
-              }
-            },
-            "x-doctronic-runtime-response": {
-              "description": "The server returns the standard success envelope while the legacy schema remains unchanged.",
-              "schema": {
-                "type": "object",
-                "required": [
-                  "code",
-                  "message",
-                  "data"
-                ],
-                "properties": {
-                  "code": {
-                    "type": "string",
-                    "const": "success"
-                  },
-                  "message": {
-                    "type": "string",
-                    "const": "Request successful"
-                  },
-                  "data": {
-                    "type": "null"
-                  }
                 }
               }
             }
@@ -2984,7 +3319,33 @@
             }
           },
           "409": {
-            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -3005,6 +3366,17 @@
                 "schema": {
                   "type": "integer",
                   "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unavailable",
+                  "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
                 }
               }
             }
@@ -3144,7 +3516,33 @@
             }
           },
           "409": {
-            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -3165,6 +3563,17 @@
                 "schema": {
                   "type": "integer",
                   "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unavailable",
+                  "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
                 }
               }
             }
@@ -3213,16 +3622,8 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {},
-                "examples": {
-                  "success": {
-                    "summary": "Actual success response",
-                    "value": {
-                      "code": "success",
-                      "message": "Request successful",
-                      "data": null
-                    }
-                  }
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessfulEmptyResponse"
                 }
               }
             },
@@ -3234,30 +3635,6 @@
                   "enum": [
                     "true"
                   ]
-                }
-              }
-            },
-            "x-doctronic-runtime-response": {
-              "description": "The server returns the standard success envelope while the legacy schema remains unchanged.",
-              "schema": {
-                "type": "object",
-                "required": [
-                  "code",
-                  "message",
-                  "data"
-                ],
-                "properties": {
-                  "code": {
-                    "type": "string",
-                    "const": "success"
-                  },
-                  "message": {
-                    "type": "string",
-                    "const": "Request successful"
-                  },
-                  "data": {
-                    "type": "null"
-                  }
                 }
               }
             }
@@ -3336,7 +3713,33 @@
             }
           },
           "409": {
-            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -3357,6 +3760,17 @@
                 "schema": {
                   "type": "integer",
                   "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unavailable",
+                  "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
                 }
               }
             }
@@ -3515,7 +3929,33 @@
             }
           },
           "409": {
-            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.idempotency.concurrent_request": {
+                    "summary": "Idempotency concurrent request",
+                    "value": {
+                      "code": "error.idempotency.concurrent_request",
+                      "message": "A request with this idempotency key is currently being processed. Please retry after a short delay."
+                    }
+                  },
+                  "error.idempotency.payload_mismatch": {
+                    "summary": "Idempotency payload mismatch",
+                    "value": {
+                      "code": "error.idempotency.payload_mismatch",
+                      "message": "This idempotency key was previously used with a different request payload. Please use a new idempotency key or send the same payload."
+                    }
+                  }
+                }
+              }
+            },
+            "x-doctronic-retryable-codes": [
+              "error.idempotency.concurrent_request"
+            ]
           },
           "422": {
             "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
@@ -3536,6 +3976,17 @@
                 "schema": {
                   "type": "integer",
                   "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unavailable",
+                  "message": "Idempotent request processing is temporarily unavailable. Please retry with the same key."
                 }
               }
             }
@@ -3727,6 +4178,1270 @@
             "XDoctronicUserID": []
           }
         ]
+      }
+    },
+    "/embed/config/": {
+      "get": {
+        "tags": [
+          "embed"
+        ],
+        "summary": "Get an embed deployment's public config",
+        "description": "Public, non-secret config for the deployment a publishable key selects. The embed iframe page uses `allowedOrigins` for its CSP `frame-ancestors`, and the rest to render the chat.\n\n`paused` is true while Doctronic has paused the deployment. The iframe still loads, but new sessions and every embed-token request answer `503 error.embed.paused`, and open streams end with an `error.embed.paused` event.\n\n`intake.state` says how the chat handles the states it serves, by `mode`: `selection` asks the visitor to pick one of `states` (the server refuses any other with `ineligibleMessage`) and may carry the `question` to ask, `disclaimer` shows `text` with the terms and collects no state, and `null` means no state step. A client that doesn't recognize the mode must not start a session.",
+        "operationId": "partners_api_embed_config_embed_config__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForEmbedConfigResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown publishable key.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.key_invalid",
+                  "message": "Unknown publishable key."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          }
+        },
+        "security": []
+      }
+    },
+    "/embed/sessions/": {
+      "post": {
+        "tags": [
+          "embed"
+        ],
+        "summary": "Start an anonymous embed session",
+        "description": "Checks eligibility against the deployment's intake rules, creates an anonymous organization-scoped user for this visit, and returns a short-lived embed token scoped to that user's chats.\n\nDoes not accept `Idempotency-Key`: a request that sends one gets `400 error.idempotency.unsupported` and creates nothing. The response holds a visitor's token, and with no organization credential the only scope a replay could use is the public deployment, which every visitor shares. A visitor whose request fails starts a new session instead.\n\nRate limited per client IP and per deployment: over a limit it answers `429 error.embed.rate_limited` with `Retry-After` (and `retryAfter` in seconds) and creates nothing. The iframe should show a \"try again in a moment\" message and retry after that time.",
+        "operationId": "partners_api_embed_sessions_create_embed_sessions__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmbedSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForEmbedSessionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "This endpoint does not accept an Idempotency-Key. Send the request without it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.idempotency.unsupported",
+                  "message": "This endpoint does not accept an Idempotency-Key. Send the request without it."
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "Unknown publishable key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.embed.key_invalid",
+                  "message": "Unknown publishable key."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This service isn't available to you. / The terms of service must be accepted first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.embed.ineligible": {
+                    "summary": "Embed ineligible",
+                    "value": {
+                      "code": "error.embed.ineligible",
+                      "message": "This service isn't available to you."
+                    }
+                  },
+                  "error.embed.terms_not_accepted": {
+                    "summary": "Embed terms not accepted",
+                    "value": {
+                      "code": "error.embed.terms_not_accepted",
+                      "message": "The terms of service must be accepted first."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "429": {
+            "description": "Too many requests right now. Please wait a moment and try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseWithEmbedRateLimitedData"
+                },
+                "example": {
+                  "code": "error.embed.rate_limited",
+                  "message": "Too many requests right now. Please wait a moment and try again.",
+                  "data": {
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Embed sessions are not configured. / This chat is paused right now. Please try again later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.embed.not_configured": {
+                    "summary": "Embed not configured",
+                    "value": {
+                      "code": "error.embed.not_configured",
+                      "message": "Embed sessions are not configured."
+                    }
+                  },
+                  "error.embed.paused": {
+                    "summary": "Embed paused",
+                    "value": {
+                      "code": "error.embed.paused",
+                      "message": "This chat is paused right now. Please try again later."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-doctronic-idempotency-unsupported": true,
+        "security": []
+      }
+    },
+    "/embed/sessions/refresh/": {
+      "post": {
+        "tags": [
+          "embed"
+        ],
+        "summary": "Refresh an embed session token",
+        "description": "Exchanges a valid embed token for a new one for the same session, before it expires. The session's user must still be active.",
+        "operationId": "partners_api_embed_sessions_refresh_embed_sessions_refresh__post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForEmbedSessionResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The embed session is missing, invalid or expired. / Unauthorized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "error.embed.session_invalid": {
+                    "summary": "Embed session invalid",
+                    "value": {
+                      "code": "error.embed.session_invalid",
+                      "message": "The embed session is missing, invalid or expired."
+                    }
+                  },
+                  "error.auth.unauthorized": {
+                    "summary": "Authentication",
+                    "value": {
+                      "code": "error.auth.unauthorized",
+                      "message": "Unauthorized."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.member.not_found",
+                  "message": "User not found."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency conflict: the key is currently being processed, or it was already used with a different payload."
+          },
+          "429": {
+            "description": "Too many requests right now. Please wait a moment and try again. Sent for embed session tokens only.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rate_limited",
+                  "message": "Too many requests right now. Please wait a moment and try again.",
+                  "data": {
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Embed sessions are not configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": "error.embed.not_configured",
+                  "message": "Embed sessions are not configured."
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "EmbedSessionToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ]
+      }
+    },
+    "/embed/chats/{chatId}/offramps/{kind}/": {
+      "get": {
+        "tags": [
+          "embed"
+        ],
+        "summary": "Get an off-ramp link for a chat",
+        "description": "A link for one of the deployment's off-ramps. It points at `GET /embed/go/{ref}/`, which records the click and redirects to the destination. The iframe renders the link; nothing is sent to the host page.",
+        "operationId": "partners_api_embed_offramp_link_embed_chats__chatId__offramps__kind___get",
+        "security": [
+          {
+            "EmbedSessionToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForOfframpLinkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The embed session is missing, invalid or expired. / Unauthorized.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.embed.session_invalid": {
+                    "summary": "Embed session invalid",
+                    "value": {
+                      "code": "error.embed.session_invalid",
+                      "message": "The embed session is missing, invalid or expired."
+                    }
+                  },
+                  "error.auth.unauthorized": {
+                    "summary": "Authentication",
+                    "value": {
+                      "code": "error.auth.unauthorized",
+                      "message": "Unauthorized."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found. / This off-ramp isn't configured. / Chat not found.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.member.not_found": {
+                    "summary": "Partner member not found",
+                    "value": {
+                      "code": "error.member.not_found",
+                      "message": "User not found."
+                    }
+                  },
+                  "error.embed.offramp_not_found": {
+                    "summary": "Embed offramp not found",
+                    "value": {
+                      "code": "error.embed.offramp_not_found",
+                      "message": "This off-ramp isn't configured."
+                    }
+                  },
+                  "error.partner.chat_not_found": {
+                    "summary": "Partner chat not found",
+                    "value": {
+                      "code": "error.partner.chat_not_found",
+                      "message": "Chat not found."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "429": {
+            "description": "Too many requests right now. Please wait a moment and try again. Sent for embed session tokens only.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rate_limited",
+                  "message": "Too many requests right now. Please wait a moment and try again.",
+                  "data": {
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Embed sessions are not configured.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.not_configured",
+                  "message": "Embed sessions are not configured."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/embed/go/{ref}/": {
+      "get": {
+        "tags": [
+          "embed"
+        ],
+        "summary": "Follow an off-ramp link",
+        "description": "Records the click and redirects (302) to the off-ramp's destination, with the deployment's correlation parameter when one is configured. Needs no Authorization header: the encrypted ref authorizes it. An expired ref, or one whose user is no longer active, still redirects, without the correlation id and without recording a click. So does a link followed too often (rate limited per client IP and per ref): the visitor still gets to the destination, but the click isn't recorded.",
+        "operationId": "partners_api_embed_offramp_redirect_embed_go__ref___get",
+        "parameters": [
+          {
+            "name": "ref",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This off-ramp isn't configured.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.offramp_not_found",
+                  "message": "This off-ramp isn't configured."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          }
+        },
+        "security": []
+      }
+    },
+    "/embed/chats/{chatId}/rating/": {
+      "post": {
+        "tags": [
+          "embed"
+        ],
+        "summary": "Rate a chat",
+        "description": "Stores the visitor's answer to the deployment's post-chat rating question (`rating` in `GET /embed/config/`) on the chat's review. Submitting again changes the score. The score must be within the deployment's scale; the review's three-level `review_type` is derived from it for reporting.",
+        "operationId": "partners_api_embed_rating_submit_embed_chats__chatId__rating__post",
+        "security": [
+          {
+            "EmbedSessionToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitRatingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForRatingResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.partner.validation",
+                  "message": "Validation error."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            }
+          },
+          "401": {
+            "description": "The embed session is missing, invalid or expired. / Unauthorized.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.embed.session_invalid": {
+                    "summary": "Embed session invalid",
+                    "value": {
+                      "code": "error.embed.session_invalid",
+                      "message": "The embed session is missing, invalid or expired."
+                    }
+                  },
+                  "error.auth.unauthorized": {
+                    "summary": "Authentication",
+                    "value": {
+                      "code": "error.auth.unauthorized",
+                      "message": "Unauthorized."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found. / Chat not found.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.member.not_found": {
+                    "summary": "Partner member not found",
+                    "value": {
+                      "code": "error.member.not_found",
+                      "message": "User not found."
+                    }
+                  },
+                  "error.partner.chat_not_found": {
+                    "summary": "Partner chat not found",
+                    "value": {
+                      "code": "error.partner.chat_not_found",
+                      "message": "Chat not found."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This deployment doesn't ask for a rating. Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rating_not_configured",
+                  "message": "This deployment doesn't ask for a rating."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "429": {
+            "description": "Too many requests right now. Please wait a moment and try again. Sent for embed session tokens only.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rate_limited",
+                  "message": "Too many requests right now. Please wait a moment and try again.",
+                  "data": {
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "embed"
+        ],
+        "summary": "Add a message to a chat's rating",
+        "description": "Sets the optional free-text follow-up (`messagePrompt` in `GET /embed/config/`) on a chat the visitor has already rated. A null message clears it.",
+        "operationId": "partners_api_embed_rating_message_embed_chats__chatId__rating__patch",
+        "security": [
+          {
+            "EmbedSessionToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Unique key for safely retrying this mutation for 24 hours. Reuse the same key only with the same request payload."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRatingMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponseForRatingResponse"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "`true` when this response was replayed from an earlier successful request.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation and the server returned HTTP 400.",
+            "x-doctronic-validation-schema": {
+              "$ref": "#/components/schemas/ValidationErrorResponse"
+            },
+            "x-doctronic-validation-example": {
+              "code": "error.validation_error",
+              "message": "Validation error",
+              "data": [
+                {
+                  "field": "body.requiredField",
+                  "message": "Field required",
+                  "code": "error.validation.missing"
+                }
+              ]
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "code": "error.validation_error",
+                  "message": "Validation error",
+                  "data": [
+                    {
+                      "field": "body.requiredField",
+                      "message": "Field required",
+                      "code": "error.validation.missing"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The embed session is missing, invalid or expired. / Unauthorized.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.embed.session_invalid": {
+                    "summary": "Embed session invalid",
+                    "value": {
+                      "code": "error.embed.session_invalid",
+                      "message": "The embed session is missing, invalid or expired."
+                    }
+                  },
+                  "error.auth.unauthorized": {
+                    "summary": "Authentication",
+                    "value": {
+                      "code": "error.auth.unauthorized",
+                      "message": "Unauthorized."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found. / Chat not found. / Rate the chat before adding a message.",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "error.member.not_found": {
+                    "summary": "Partner member not found",
+                    "value": {
+                      "code": "error.member.not_found",
+                      "message": "User not found."
+                    }
+                  },
+                  "error.partner.chat_not_found": {
+                    "summary": "Partner chat not found",
+                    "value": {
+                      "code": "error.partner.chat_not_found",
+                      "message": "Chat not found."
+                    }
+                  },
+                  "error.embed.rating_not_found": {
+                    "summary": "Embed rating not found",
+                    "value": {
+                      "code": "error.embed.rating_not_found",
+                      "message": "Rate the chat before adding a message."
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This deployment doesn't ask for a rating. Idempotency conflict: the key is currently being processed, or it was already used with a different payload.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rating_not_configured",
+                  "message": "This deployment doesn't ask for a rating."
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Legacy FastAPI schema artifact retained for code-generation compatibility. The server returns HTTP 400, not 422, when request validation fails.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "x-doctronic-legacy-schema-artifact": true
+          },
+          "429": {
+            "description": "Too many requests right now. Please wait a moment and try again. Sent for embed session tokens only.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before retrying.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "error.embed.rate_limited",
+                  "message": "Too many requests right now. Please wait a moment and try again.",
+                  "data": {
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Idempotent request coordination is temporarily unavailable before processing begins.",
+            "headers": {
+              "Retry-After": {
+                "description": "Minimum wait in seconds before retrying with the same Idempotency-Key and request body.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "appointment.call_ended": {
+      "post": {
+        "summary": "appointment.call_ended",
+        "description": "The appointment's call ended.\n\nSent as a signed `POST` to your webhook URL when your organization is subscribed to this event. Every attempt carries the same `eventId`, and events can arrive out of order.",
+        "operationId": "webhook_appointment_call_ended",
+        "parameters": [
+          {
+            "name": "X-Doctronic-Signature",
+            "in": "header",
+            "required": true,
+            "description": "Lowercase hexadecimal HMAC-SHA256 of the exact request body bytes, keyed with your webhook secret. Verify it against the raw body before parsing it, with a constant-time comparison.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCallEndedPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "429": {
+            "description": "Retried with exponential backoff while the event's retry window lasts. The window is shorter for `appointment.waiting_room_ready`, and `appointment.waiting_room_ready` and `appointment.practitioner_joined` also stop once the appointment has ended."
+          },
+          "2XX": {
+            "description": "Acknowledges the delivery."
+          },
+          "4XX": {
+            "description": "A permanent failure: the delivery isn't retried, except after a `429`."
+          },
+          "default": {
+            "description": "Any other status, a network failure or a timeout is retried with exponential backoff while the event's retry window lasts. The window is shorter for `appointment.waiting_room_ready`, and `appointment.waiting_room_ready` and `appointment.practitioner_joined` also stop once the appointment has ended."
+          }
+        }
+      }
+    },
+    "appointment.practitioner_joined": {
+      "post": {
+        "summary": "appointment.practitioner_joined",
+        "description": "A practitioner joined the appointment's call.\n\nSent as a signed `POST` to your webhook URL when your organization is subscribed to this event. Every attempt carries the same `eventId`, and events can arrive out of order.",
+        "operationId": "webhook_appointment_practitioner_joined",
+        "parameters": [
+          {
+            "name": "X-Doctronic-Signature",
+            "in": "header",
+            "required": true,
+            "description": "Lowercase hexadecimal HMAC-SHA256 of the exact request body bytes, keyed with your webhook secret. Verify it against the raw body before parsing it, with a constant-time comparison.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentPractitionerJoinedPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "429": {
+            "description": "Retried with exponential backoff while the event's retry window lasts. The window is shorter for `appointment.waiting_room_ready`, and `appointment.waiting_room_ready` and `appointment.practitioner_joined` also stop once the appointment has ended."
+          },
+          "2XX": {
+            "description": "Acknowledges the delivery."
+          },
+          "4XX": {
+            "description": "A permanent failure: the delivery isn't retried, except after a `429`."
+          },
+          "default": {
+            "description": "Any other status, a network failure or a timeout is retried with exponential backoff while the event's retry window lasts. The window is shorter for `appointment.waiting_room_ready`, and `appointment.waiting_room_ready` and `appointment.practitioner_joined` also stop once the appointment has ended."
+          }
+        }
+      }
+    },
+    "appointment.waiting_room_ready": {
+      "post": {
+        "summary": "appointment.waiting_room_ready",
+        "description": "The appointment's waiting room is ready to join. Replace any `waitingRoomUrl` you stored for it earlier.\n\nSent as a signed `POST` to your webhook URL when your organization is subscribed to this event. Every attempt carries the same `eventId`, and events can arrive out of order.",
+        "operationId": "webhook_appointment_waiting_room_ready",
+        "parameters": [
+          {
+            "name": "X-Doctronic-Signature",
+            "in": "header",
+            "required": true,
+            "description": "Lowercase hexadecimal HMAC-SHA256 of the exact request body bytes, keyed with your webhook secret. Verify it against the raw body before parsing it, with a constant-time comparison.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentWaitingRoomReadyPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "429": {
+            "description": "Retried with exponential backoff while the event's retry window lasts. The window is shorter for `appointment.waiting_room_ready`, and `appointment.waiting_room_ready` and `appointment.practitioner_joined` also stop once the appointment has ended."
+          },
+          "2XX": {
+            "description": "Acknowledges the delivery."
+          },
+          "4XX": {
+            "description": "A permanent failure: the delivery isn't retried, except after a `429`."
+          },
+          "default": {
+            "description": "Any other status, a network failure or a timeout is retried with exponential backoff while the event's retry window lasts. The window is shorter for `appointment.waiting_room_ready`, and `appointment.waiting_room_ready` and `appointment.practitioner_joined` also stop once the appointment has ended."
+          }
+        }
+      }
+    },
+    "artifact.ready": {
+      "post": {
+        "summary": "artifact.ready",
+        "description": "A consultation document is ready to retrieve with `GET /artifacts/{artifactId}/`. `userId` can be null.\n\nSent as a signed `POST` to your webhook URL when your organization is subscribed to this event. Every attempt carries the same `eventId`, and events can arrive out of order.",
+        "operationId": "webhook_artifact_ready",
+        "parameters": [
+          {
+            "name": "X-Doctronic-Signature",
+            "in": "header",
+            "required": true,
+            "description": "Lowercase hexadecimal HMAC-SHA256 of the exact request body bytes, keyed with your webhook secret. Verify it against the raw body before parsing it, with a constant-time comparison.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtifactReadyPayload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "429": {
+            "description": "Retried with exponential backoff while the event's retry window lasts. The window is shorter for `appointment.waiting_room_ready`, and `appointment.waiting_room_ready` and `appointment.practitioner_joined` also stop once the appointment has ended."
+          },
+          "2XX": {
+            "description": "Acknowledges the delivery."
+          },
+          "4XX": {
+            "description": "A permanent failure: the delivery isn't retried, except after a `429`."
+          },
+          "default": {
+            "description": "Any other status, a network failure or a timeout is retried with exponential backoff while the event's retry window lasts. The window is shorter for `appointment.waiting_room_ready`, and `appointment.waiting_room_ready` and `appointment.practitioner_joined` also stop once the appointment has ended."
+          }
+        }
       }
     }
   },
@@ -4170,6 +5885,17 @@
           }
         }
       },
+      "ArtifactType": {
+        "type": "string",
+        "enum": [
+          "long_summary",
+          "short_summary",
+          "soap_note",
+          "clinician_note"
+        ],
+        "title": "ArtifactType",
+        "description": "Organization-retrievable consultation artifact kinds."
+      },
       "AsapAppointmentRequest": {
         "properties": {
           "chatId": {
@@ -4359,10 +6085,43 @@
                 "type": "null"
               }
             ]
+          },
+          "starterPromptIndex": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Embed sessions only: the index, in `content.starterPrompts` of `GET /embed/config/`, of the starter prompt the visitor picked to start this chat. Omit it when the visitor typed their own question."
           }
         },
         "type": "object",
         "title": "CreateChatRequest"
+      },
+      "CreateEmbedSessionRequest": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "termsAccepted": {
+            "type": "boolean"
+          },
+          "intake": {
+            "$ref": "#/components/schemas/EmbedIntakeRequest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "termsAccepted",
+          "intake"
+        ],
+        "title": "CreateEmbedSessionRequest"
       },
       "CreateUserRequest": {
         "properties": {
@@ -4439,6 +6198,427 @@
         "title": "CreateUserRequest",
         "description": "Request body for a user in your organization. All fields are optional at creation time. `firstName`, `lastName`, `dateOfBirth`, and `phoneNumber` are required later for appointment booking. When provided, `dateOfBirth` must represent an age from 18 through 120."
       },
+      "EmbedConfigResponse": {
+        "properties": {
+          "deploymentId": {
+            "type": "string"
+          },
+          "partnerId": {
+            "type": "string"
+          },
+          "configVersion": {
+            "type": "string"
+          },
+          "allowedOrigins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "theme": {
+            "$ref": "#/components/schemas/EmbedTheme"
+          },
+          "content": {
+            "$ref": "#/components/schemas/EmbedCopy"
+          },
+          "intake": {
+            "$ref": "#/components/schemas/EmbedIntake"
+          },
+          "offramps": {
+            "items": {
+              "$ref": "#/components/schemas/EmbedOfframpConfig"
+            },
+            "type": "array"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmbedRatingConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hiddenArtifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactType"
+            },
+            "type": "array"
+          },
+          "hideSoapNote": {
+            "type": "boolean"
+          },
+          "paused": {
+            "type": "boolean"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deploymentId",
+          "partnerId",
+          "configVersion",
+          "allowedOrigins",
+          "theme",
+          "content",
+          "intake",
+          "offramps",
+          "rating",
+          "hiddenArtifacts",
+          "hideSoapNote",
+          "paused"
+        ],
+        "title": "EmbedConfigResponse"
+      },
+      "EmbedCopy": {
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "inputPlaceholder": {
+            "type": "string",
+            "default": "Ask anything about your health"
+          },
+          "fallbackContact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "introMessage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "starterPrompts": {
+            "items": {
+              "$ref": "#/components/schemas/EmbedStarterPrompt"
+            },
+            "type": "array",
+            "maxItems": 6,
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "body"
+        ],
+        "title": "EmbedCopy"
+      },
+      "EmbedIntake": {
+        "properties": {
+          "minAge": {
+            "type": "integer",
+            "default": 18
+          },
+          "state": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/StateSelection"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StateDisclaimer"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "mode",
+                  "mapping": {
+                    "disclaimer": "#/components/schemas/StateDisclaimer",
+                    "selection": "#/components/schemas/StateSelection"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ineligibleMessage": {
+            "type": "string",
+            "default": "Sorry, this service isn't available to you yet."
+          }
+        },
+        "type": "object",
+        "title": "EmbedIntake"
+      },
+      "EmbedIntakeRequest": {
+        "properties": {
+          "age": {
+            "type": "integer",
+            "maximum": 120,
+            "minimum": 0
+          },
+          "sex": {
+            "$ref": "#/components/schemas/Sex"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "age",
+          "sex"
+        ],
+        "title": "EmbedIntakeRequest"
+      },
+      "EmbedOfframpConfig": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "showWhen": {
+            "$ref": "#/components/schemas/EmbedOfframpTrigger"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "showWhen"
+        ],
+        "title": "EmbedOfframpConfig"
+      },
+      "EmbedOfframpTrigger": {
+        "properties": {
+          "ctaWidgets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "default": []
+          },
+          "onConversationEnd": {
+            "type": "boolean",
+            "default": false
+          },
+          "afterAssistantReplies": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "EmbedOfframpTrigger",
+        "description": "When a client shows an off-ramp. Any condition that matches shows it; once shown it stays.\n\nEvaluated by the embed iframe from stream events; the server only serves the rule."
+      },
+      "EmbedRateLimitedData": {
+        "properties": {
+          "retryAfter": {
+            "type": "integer",
+            "examples": [
+              60
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "retryAfter"
+        ],
+        "title": "EmbedRateLimitedData"
+      },
+      "EmbedRatingConfig": {
+        "properties": {
+          "scale": {
+            "type": "string"
+          },
+          "min": {
+            "type": "integer"
+          },
+          "max": {
+            "type": "integer"
+          },
+          "question": {
+            "type": "string"
+          },
+          "minLabel": {
+            "type": "string"
+          },
+          "maxLabel": {
+            "type": "string"
+          },
+          "messagePrompt": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scale",
+          "min",
+          "max",
+          "question",
+          "minLabel",
+          "maxLabel",
+          "messagePrompt"
+        ],
+        "title": "EmbedRatingConfig"
+      },
+      "EmbedSessionResponse": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The embed session token. Opaque: send it as a Bearer token, don't parse it."
+          },
+          "expiresAt": {
+            "type": "integer",
+            "description": "When the token expires, in Unix seconds on the server's clock."
+          },
+          "refreshAfter": {
+            "type": "integer",
+            "description": "When to refresh the token, in Unix seconds on the server's clock."
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Seconds from this response until the token expires. Unlike `expiresAt`, it doesn't depend on the client's clock. A replayed response (same `Idempotency-Key`) repeats the original value."
+          },
+          "refreshInSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Seconds from this response until the client should refresh the token. Unlike `refreshAfter`, it doesn't depend on the client's clock. A replayed response (same `Idempotency-Key`) repeats the original value."
+          },
+          "configVersion": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "expiresAt",
+          "refreshAfter",
+          "expiresInSeconds",
+          "refreshInSeconds",
+          "configVersion"
+        ],
+        "title": "EmbedSessionResponse"
+      },
+      "EmbedStarterPrompt": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "message"
+        ],
+        "title": "EmbedStarterPrompt",
+        "description": "A suggested first question on the landing. Picking it sends `message` as the visitor's first message."
+      },
+      "EmbedTheme": {
+        "properties": {
+          "primaryColor": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "secondaryColor": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "headlineFont": {
+            "type": "string"
+          },
+          "bodyFont": {
+            "type": "string"
+          },
+          "fontStylesheetUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "primaryColor",
+          "secondaryColor",
+          "headlineFont",
+          "bodyFont"
+        ],
+        "title": "EmbedTheme"
+      },
       "ErrorResponse": {
         "properties": {
           "code": {
@@ -4478,6 +6658,30 @@
         },
         "type": "object",
         "title": "ErrorResponseWithAppointmentWaitingRoomUnavailableData"
+      },
+      "ErrorResponseWithEmbedRateLimitedData": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "default": "error"
+          },
+          "message": {
+            "type": "string",
+            "default": ""
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmbedRateLimitedData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ErrorResponseWithEmbedRateLimitedData"
       },
       "ErrorResponseWithInsufficientScopeData": {
         "properties": {
@@ -4594,6 +6798,26 @@
           "messageId"
         ],
         "title": "MessageResponse"
+      },
+      "OfframpLinkResponse": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "url"
+        ],
+        "title": "OfframpLinkResponse"
       },
       "Page_AppointmentResponse_": {
         "properties": {
@@ -4808,6 +7032,66 @@
         "type": "object",
         "title": "PharmacyAddress"
       },
+      "PharmacySearchAddress": {
+        "properties": {
+          "line1": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1
+          },
+          "line2": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postalCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]{5}(?:-?[0-9]{4})?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "line1"
+        ],
+        "title": "PharmacySearchAddress",
+        "description": "Optional narrowing filter for the pharmacy's address, not the patient's."
+      },
       "PharmacySearchRequest": {
         "properties": {
           "searchTerm": {
@@ -4843,6 +7127,29 @@
               }
             ],
             "description": "US state code, e.g. 'NY', where the pharmacy is located."
+          },
+          "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pharmacy phone, optionally prefixed with +1. Overrides searchTerm; filters nearby Canvas results."
+          },
+          "address": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PharmacySearchAddress"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pharmacy address to narrow results. All supplied fields must match; line1 is required."
           }
         },
         "type": "object",
@@ -4851,7 +7158,7 @@
           "longitude"
         ],
         "title": "PharmacySearchRequest",
-        "description": "Request body for searching pharmacies, used to route any prescriptions resulting\nfrom an appointment.\n\n`latitude` and `longitude` are always required. `search_term` is optional; when\nomitted, results are sorted by proximity to the given location. `state` optionally\nfilters results to a single US state."
+        "description": "Request body for searching pharmacies, used to route any prescriptions resulting\nfrom an appointment.\n\n`latitude` and `longitude` are always required. `search_term` is optional; when\nomitted, results are sorted by proximity to the given location. `state` optionally\nfilters results to a single US state. When `phone_number` is supplied,\nsearch by proximity without a name filter, then compare normalized phones."
       },
       "PharmacySearchResponse": {
         "properties": {
@@ -4882,6 +7189,22 @@
         ],
         "title": "PharmacySetRequest",
         "description": "Request body for setting the pharmacy on file for the authenticated user (upsert)."
+      },
+      "RatingResponse": {
+        "properties": {
+          "score": {
+            "type": "integer"
+          },
+          "scale": {
+            "type": "string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "scale"
+        ],
+        "title": "RatingResponse"
       },
       "RescheduleAppointmentRequest": {
         "properties": {
@@ -5089,6 +7412,71 @@
         ],
         "title": "State"
       },
+      "StateDisclaimer": {
+        "properties": {
+          "states": {
+            "items": {
+              "$ref": "#/components/schemas/State"
+            },
+            "type": "array",
+            "minItems": 1
+          },
+          "mode": {
+            "type": "string",
+            "const": "disclaimer",
+            "default": "disclaimer"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "states",
+          "text"
+        ],
+        "title": "StateDisclaimer",
+        "description": "The terms step shows `text`, which names the states served. No state is collected or enforced."
+      },
+      "StateSelection": {
+        "properties": {
+          "states": {
+            "items": {
+              "$ref": "#/components/schemas/State"
+            },
+            "type": "array",
+            "minItems": 1
+          },
+          "mode": {
+            "type": "string",
+            "const": "selection",
+            "default": "selection"
+          },
+          "ineligibleMessage": {
+            "type": "string",
+            "minLength": 1
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "states",
+          "ineligibleMessage"
+        ],
+        "title": "StateSelection",
+        "description": "The visitor picks a state from `states`; the server rejects any other."
+      },
       "StreamChatRequest": {
         "properties": {
           "userEvent": {
@@ -5104,6 +7492,18 @@
           "userEvent"
         ],
         "title": "StreamChatRequest"
+      },
+      "SubmitRatingRequest": {
+        "properties": {
+          "score": {
+            "type": "integer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score"
+        ],
+        "title": "SubmitRatingRequest"
       },
       "SuccessResponseForAddressResponse": {
         "properties": {
@@ -5266,6 +7666,75 @@
         ],
         "title": "SuccessResponseForChatResponse"
       },
+      "SuccessResponseForEmbedConfigResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EmbedConfigResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForEmbedConfigResponse"
+      },
+      "SuccessResponseForEmbedSessionResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EmbedSessionResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForEmbedSessionResponse"
+      },
+      "SuccessResponseForOfframpLinkResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/OfframpLinkResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForOfframpLinkResponse"
+      },
       "SuccessResponseForPage_AppointmentResponse_": {
         "properties": {
           "code": {
@@ -5358,6 +7827,29 @@
         ],
         "title": "SuccessResponseForPharmacySearchResponse"
       },
+      "SuccessResponseForRatingResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Success code",
+            "default": "success"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "default": "Request successful"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RatingResponse",
+            "description": "Response data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "SuccessResponseForRatingResponse"
+      },
       "SuccessResponseForScheduledAppointmentResponse": {
         "properties": {
           "code": {
@@ -5447,6 +7939,26 @@
         },
         "type": "object",
         "title": "SuccessfulEmptyResponse"
+      },
+      "UpdateRatingMessageRequest": {
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "UpdateRatingMessageRequest"
       },
       "UpdateUserRequest": {
         "properties": {
@@ -5730,6 +8242,663 @@
           }
         }
       },
+      "ConsultationArtifacts": {
+        "description": "IDs of the consultation's documents, for `GET /artifacts/{artifactId}/`; `null` when one isn't available.",
+        "properties": {
+          "longSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "shortSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "soapNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "ConsultationArtifacts",
+        "type": "object",
+        "required": [
+          "longSummary",
+          "shortSummary",
+          "soapNote"
+        ]
+      },
+      "GuardianCategory": {
+        "enum": [
+          "emergency",
+          "safety",
+          "feedback",
+          "other"
+        ],
+        "type": "string"
+      },
+      "PartnerGuardianId": {
+        "enum": [
+          "emergency_acute_aortic_dissection_or_ruptured_aortic_aneurysm",
+          "emergency_acute_coronary_syndrome",
+          "emergency_breathing",
+          "emergency_cerebrovascular_accident_or_stroke",
+          "emergency_constant_bleeding",
+          "emergency_crushing_chest_pain",
+          "emergency_domestic_abuse",
+          "emergency_exact_words",
+          "emergency_harm_others",
+          "emergency_major_trauma",
+          "emergency_psychotic_event",
+          "emergency_seizure",
+          "emergency_self_harm",
+          "emergency_severe_abdominal_pain",
+          "emergency_shortness_of_breath",
+          "emergency_stroke",
+          "emergency_venomous_bite",
+          "emergency_worst_headache",
+          "agent_feedback_negative",
+          "agent_feedback_positive",
+          "check_emergency_phrase",
+          "check_input_language",
+          "custom_guardians_gateway",
+          "security_gateway",
+          "extraction_decomposition_detector",
+          "harmful_content_detector",
+          "identity_instruction_attack_detector",
+          "policy_violation",
+          "prompt_injection",
+          "uncommon_message",
+          "unified_emergency_detector"
+        ],
+        "title": "PartnerGuardianId",
+        "type": "string"
+      },
+      "StreamChatCTAEvent": {
+        "description": "An end-of-flow call to action. Use `text` as its label when present.",
+        "properties": {
+          "type": {
+            "const": "skill_code.cta",
+            "default": "skill_code.cta",
+            "type": "string"
+          },
+          "skillCode": {
+            "type": "string"
+          },
+          "widget": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "StreamChatCTAEvent",
+        "type": "object",
+        "required": [
+          "type",
+          "skillCode"
+        ]
+      },
+      "StreamChatConsultationCompleteEvent": {
+        "description": "The consultation is complete. `artifacts` holds the IDs of its documents.",
+        "properties": {
+          "type": {
+            "const": "ai_consultation.complete",
+            "default": "ai_consultation.complete",
+            "type": "string"
+          },
+          "artifacts": {
+            "$ref": "#/components/schemas/ConsultationArtifacts"
+          }
+        },
+        "title": "StreamChatConsultationCompleteEvent",
+        "type": "object",
+        "required": [
+          "type",
+          "artifacts"
+        ]
+      },
+      "StreamChatConversationEndEvent": {
+        "description": "The assistant ended the conversation; `reason` explains why when present.",
+        "properties": {
+          "type": {
+            "const": "conversation.end",
+            "default": "conversation.end",
+            "type": "string"
+          },
+          "messageId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "StreamChatConversationEndEvent",
+        "type": "object",
+        "required": [
+          "type"
+        ]
+      },
+      "StreamChatConversationOfftopicEvent": {
+        "description": "The user's message was classified as off-topic.",
+        "properties": {
+          "type": {
+            "const": "conversation.offtopic",
+            "default": "conversation.offtopic",
+            "type": "string"
+          },
+          "messageId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "StreamChatConversationOfftopicEvent",
+        "type": "object",
+        "required": [
+          "type"
+        ]
+      },
+      "StreamChatErrorEvent": {
+        "description": "An error; the stream ends after it. Don't resend the turn automatically: it may already have produced work.",
+        "properties": {
+          "type": {
+            "const": "error",
+            "default": "error",
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryAfterSeconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "StreamChatErrorEvent",
+        "type": "object",
+        "required": [
+          "type",
+          "errorCode",
+          "message"
+        ]
+      },
+      "StreamChatGuardianEvent": {
+        "description": "A safety condition was detected. Show `title` and `text` when present. When `endsConversation` is true, stop\ninput but keep reading until `conversation.end`. Treat a repeated `guardianId` in the same turn as an update.",
+        "properties": {
+          "type": {
+            "const": "guardian",
+            "default": "guardian",
+            "type": "string"
+          },
+          "guardianId": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PartnerGuardianId"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "message": {
+            "default": "",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "endsConversation": {
+            "default": false,
+            "type": "boolean"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GuardianCategory"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "default": "other"
+          }
+        },
+        "title": "StreamChatGuardianEvent",
+        "type": "object",
+        "required": [
+          "type",
+          "guardianId",
+          "message",
+          "endsConversation",
+          "category"
+        ]
+      },
+      "StreamChatMessageContentEvent": {
+        "description": "A chunk of the message's text: append it to the message with the same `messageId`.",
+        "properties": {
+          "type": {
+            "const": "message.content",
+            "default": "message.content",
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "title": "StreamChatMessageContentEvent",
+        "type": "object",
+        "required": [
+          "type",
+          "messageId",
+          "content"
+        ]
+      },
+      "StreamChatMessageStartEvent": {
+        "description": "A message started. Its text follows in `message.content` events with the same `messageId`.",
+        "properties": {
+          "type": {
+            "const": "message.start",
+            "default": "message.start",
+            "type": "string"
+          },
+          "role": {
+            "default": "assistant",
+            "enum": [
+              "assistant",
+              "user"
+            ],
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          },
+          "messageTimestamp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "When the message started, in epoch milliseconds."
+          }
+        },
+        "title": "StreamChatMessageStartEvent",
+        "type": "object",
+        "required": [
+          "type",
+          "role",
+          "messageId"
+        ]
+      },
+      "StreamChatMessageStopEvent": {
+        "description": "The message with this `messageId` is complete. The turn can go on with more messages.",
+        "properties": {
+          "type": {
+            "const": "message.stop",
+            "default": "message.stop",
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string"
+          }
+        },
+        "title": "StreamChatMessageStopEvent",
+        "type": "object",
+        "required": [
+          "type",
+          "messageId"
+        ]
+      },
+      "StreamChatEvent": {
+        "title": "StreamChatEvent",
+        "description": "The JSON `data` of one event of `POST /chats/{chatId}/stream/`, keyed on `type`, which matches the SSE `event:` name. New event types may be added: ignore types you don't recognize.",
+        "discriminator": {
+          "mapping": {
+            "ai_consultation.complete": "#/components/schemas/StreamChatConsultationCompleteEvent",
+            "conversation.end": "#/components/schemas/StreamChatConversationEndEvent",
+            "conversation.offtopic": "#/components/schemas/StreamChatConversationOfftopicEvent",
+            "error": "#/components/schemas/StreamChatErrorEvent",
+            "guardian": "#/components/schemas/StreamChatGuardianEvent",
+            "message.content": "#/components/schemas/StreamChatMessageContentEvent",
+            "message.start": "#/components/schemas/StreamChatMessageStartEvent",
+            "message.stop": "#/components/schemas/StreamChatMessageStopEvent",
+            "skill_code.cta": "#/components/schemas/StreamChatCTAEvent"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/StreamChatMessageStartEvent"
+          },
+          {
+            "$ref": "#/components/schemas/StreamChatMessageContentEvent"
+          },
+          {
+            "$ref": "#/components/schemas/StreamChatMessageStopEvent"
+          },
+          {
+            "$ref": "#/components/schemas/StreamChatConversationEndEvent"
+          },
+          {
+            "$ref": "#/components/schemas/StreamChatConversationOfftopicEvent"
+          },
+          {
+            "$ref": "#/components/schemas/StreamChatGuardianEvent"
+          },
+          {
+            "$ref": "#/components/schemas/StreamChatErrorEvent"
+          },
+          {
+            "$ref": "#/components/schemas/StreamChatCTAEvent"
+          },
+          {
+            "$ref": "#/components/schemas/StreamChatConsultationCompleteEvent"
+          }
+        ]
+      },
+      "AppointmentCallEndedData": {
+        "properties": {
+          "appointmentId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "appointmentId",
+          "userId"
+        ],
+        "title": "AppointmentCallEndedData",
+        "type": "object"
+      },
+      "AppointmentCallEndedPayload": {
+        "description": "The appointment's call ended.",
+        "properties": {
+          "eventId": {
+            "description": "Unique ID of the event, the same on every delivery attempt. Deduplicate on it.",
+            "type": "string"
+          },
+          "occurredAt": {
+            "description": "When the event happened (UTC), not when this attempt was sent.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "event": {
+            "const": "appointment.call_ended",
+            "default": "appointment.call_ended",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AppointmentCallEndedData"
+          }
+        },
+        "required": [
+          "eventId",
+          "occurredAt",
+          "event",
+          "data"
+        ],
+        "title": "AppointmentCallEndedPayload",
+        "type": "object"
+      },
+      "AppointmentPractitionerJoinedData": {
+        "properties": {
+          "appointmentId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "appointmentId",
+          "userId"
+        ],
+        "title": "AppointmentPractitionerJoinedData",
+        "type": "object"
+      },
+      "AppointmentPractitionerJoinedPayload": {
+        "description": "A practitioner joined the appointment's call.",
+        "properties": {
+          "eventId": {
+            "description": "Unique ID of the event, the same on every delivery attempt. Deduplicate on it.",
+            "type": "string"
+          },
+          "occurredAt": {
+            "description": "When the event happened (UTC), not when this attempt was sent.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "event": {
+            "const": "appointment.practitioner_joined",
+            "default": "appointment.practitioner_joined",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AppointmentPractitionerJoinedData"
+          }
+        },
+        "required": [
+          "eventId",
+          "occurredAt",
+          "event",
+          "data"
+        ],
+        "title": "AppointmentPractitionerJoinedPayload",
+        "type": "object"
+      },
+      "AppointmentWaitingRoomReadyData": {
+        "properties": {
+          "appointmentId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "waitingRoomUrl": {
+            "description": "HTTPS URL for joining the appointment; currently expires one hour after issuance and may rotate when reissued.",
+            "examples": [
+              "https://dctd.co/r/example/"
+            ],
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "appointmentId",
+          "userId",
+          "waitingRoomUrl"
+        ],
+        "title": "AppointmentWaitingRoomReadyData",
+        "type": "object"
+      },
+      "AppointmentWaitingRoomReadyPayload": {
+        "description": "The appointment's waiting room is ready to join. Replace any `waitingRoomUrl` you stored for it earlier.",
+        "properties": {
+          "eventId": {
+            "description": "Unique ID of the event, the same on every delivery attempt. Deduplicate on it.",
+            "type": "string"
+          },
+          "occurredAt": {
+            "description": "When the event happened (UTC), not when this attempt was sent.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "event": {
+            "const": "appointment.waiting_room_ready",
+            "default": "appointment.waiting_room_ready",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AppointmentWaitingRoomReadyData"
+          }
+        },
+        "required": [
+          "eventId",
+          "occurredAt",
+          "event",
+          "data"
+        ],
+        "title": "AppointmentWaitingRoomReadyPayload",
+        "type": "object"
+      },
+      "ArtifactReadyData": {
+        "properties": {
+          "artifactId": {
+            "type": "string"
+          },
+          "artifactType": {
+            "$ref": "#/components/schemas/ArtifactType"
+          },
+          "chatId": {
+            "type": "string"
+          },
+          "userId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "artifactId",
+          "artifactType",
+          "chatId",
+          "userId"
+        ],
+        "title": "ArtifactReadyData",
+        "type": "object"
+      },
+      "ArtifactReadyPayload": {
+        "description": "A consultation document is ready to retrieve with `GET /artifacts/{artifactId}/`. `userId` can be null.",
+        "properties": {
+          "eventId": {
+            "description": "Unique ID of the event, the same on every delivery attempt. Deduplicate on it.",
+            "type": "string"
+          },
+          "occurredAt": {
+            "description": "When the event happened (UTC), not when this attempt was sent.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "event": {
+            "const": "artifact.ready",
+            "default": "artifact.ready",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ArtifactReadyData"
+          }
+        },
+        "required": [
+          "eventId",
+          "occurredAt",
+          "event",
+          "data"
+        ],
+        "title": "ArtifactReadyPayload",
+        "type": "object"
+      },
       "UserMessageEvent": {
         "properties": {
           "type": {
@@ -5769,6 +8938,11 @@
         "description": "Doctronic user ID returned as `data.id` by `POST /users/`. This value identifies the user in your organization scope; it is not an API token.",
         "in": "header",
         "name": "X-Doctronic-User-ID"
+      },
+      "EmbedSessionToken": {
+        "type": "http",
+        "description": "Short-lived embed session token (`dct_emb_...`) from `POST /embed/sessions/`, sent as a Bearer token. It identifies one anonymous visitor, so user-scoped chat operations don't take `X-Doctronic-User-ID` with it. Requests with it are rate limited per session, and chat creation and streams also per client IP and per deployment: over a limit they answer `429 error.embed.rate_limited` with `Retry-After`.",
+        "scheme": "bearer"
       }
     },
     "responses": {
@@ -5793,6 +8967,10 @@
         }
       }
     }
+  },
+  "externalDocs": {
+    "description": "Doctronic developer documentation",
+    "url": "https://docs.doctronic.ai/"
   },
   "servers": [
     {
@@ -5832,6 +9010,10 @@
     {
       "name": "coverage",
       "description": "Operations for coverage."
+    },
+    {
+      "name": "embed",
+      "description": "Operations for embed."
     }
   ]
 }

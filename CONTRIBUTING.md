@@ -49,6 +49,10 @@ uv run python scripts/contract_changes.py <old> <new>          # What changes be
 - `models.py` has the pydantic models (datamodel-code-generator). `operations.py` has the facts the
   client reads at runtime: idempotency, user scope, streaming, whether `data` is required, the
   documented statuses, and the final `409` codes.
+- `events.py` maps each chat stream event `type` to its model, from the union the stream's
+  `x-doctronic-event-schema` names, and each webhook `event` to its payload model, from the
+  contract's `webhooks`. `src/doctronic/_streaming.py` and `src/doctronic/webhooks.py` parse with
+  them. The generator stops with an error when the contract lacks either section.
 - The generator covers the operations that take the organization API token: those whose security
   names `HTTPBearer`. Others, such as browser-only operations, are skipped and listed, along with
   the schemas only they use.

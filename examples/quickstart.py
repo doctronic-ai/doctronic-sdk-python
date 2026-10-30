@@ -42,7 +42,7 @@ with patient.chats.stream(
 ) as stream:
     for event in stream:
         if isinstance(event, MessageStartEvent):
-            messages[event.message_id] = {"role": event.role, "text": ""}
+            messages[event.message_id] = {"role": event.role.value, "text": ""}
         elif isinstance(event, MessageContentEvent):
             messages[event.message_id]["text"] += event.content
         elif isinstance(event, MessageStopEvent):
