@@ -11,15 +11,20 @@ The SDK covers the operations an organization API token calls: those whose secur
 `HTTPBearer` scheme. Other operations, such as browser-only ones authenticated another way, are
 skipped, along with the schemas only they use.
 
-Writes two files:
+Writes three files:
 - `models.py`: pydantic v2 models for every schema, from datamodel-code-generator. Enums accept
-  values the contract doesn't list yet (`doctronic._enums.OpenEnum`).
+  values the contract doesn't list yet (`doctronic._enums.OpenEnum`). A required field keeps the
+  default the contract declares for it, such as an event's `type`.
 - `operations.py`: one entry per operation, with the facts the client reads at runtime:
   whether the operation is idempotent (declares an `Idempotency-Key` header), whether it is
   user-scoped (requires `X-Doctronic-User-ID`), whether it streams (`text/event-stream`), whether
   its success envelope requires `data`, the response statuses it documents, and the 409 codes
   that are final: the codes its 409 examples document, minus any the 409 response lists in
   `x-doctronic-retryable-codes`.
+- `events.py`: the model of each chat stream event, by its `type`, from the discriminated union
+  the stream's `x-doctronic-event-schema` names; and the payload model of each webhook, by its
+  `event`, from the contract's `webhooks`. The generator stops if the contract lacks either,
+  rather than leave the SDK without the models.
 
 CI regenerates from the pinned contract and fails when the output differs from the commit.
 """
@@ -49,6 +54,15 @@ ORGANIZATION_SCHEME = "HTTPBearer"
 """The security scheme of the organization API token, the only credential the SDK sends."""
 RETRYABLE_CODES = "x-doctronic-retryable-codes"
 """A 409 response's list of error codes that are safe to retry with the same idempotency key."""
+EVENT_SCHEMA = "x-doctronic-event-schema"
+"""On a `text/event-stream` media type: a `$ref` to the schema of each event's JSON `data`."""
+SCHEMAS = "#/components/schemas/"
+STREAM_DISCRIMINATOR = "type"
+"""The property that names a stream event, the same as its SSE `event:` name."""
+WEBHOOK_ENVELOPE = ("eventId", "event", "occurredAt", "data")
+"""The fields every webhook payload requires. `event` names the webhook."""
+SIGNATURE_HEADER = "X-Doctronic-Signature"
+"""The header `doctronic.verify_webhook()` checks. Every webhook must declare it."""
 
 
 def load_contract(source: str) -> dict[str, Any]:
@@ -101,6 +115,11 @@ def generate_models(contract: dict[str, Any], output: Path) -> None:
                 "--use-standard-collections",
                 "--use-double-quotes",
                 "--use-type-alias",
+                # A required field with a contract default keeps it, such as an event's `type`.
+                # An enum default is the enum member, not its string.
+                "--use-default",
+                "--deserialize-default-values",
+                "enum",
                 "--use-subclass-enum",
                 "--use-schema-description",
                 "--use-field-description",
@@ -229,7 +248,7 @@ def organization_contract(contract: dict[str, Any]) -> dict[str, Any]:
     """The contract without the operations the SDK skips and the components only they use.
 
     Components that no operation uses are kept, so the models don't depend on which operations
-    happen to reference them.
+    happen to reference them, and so are the ones the `webhooks` use.
     """
     _check_organization_scheme(contract)
     pruned = copy.deepcopy(contract)
@@ -249,7 +268,7 @@ def organization_contract(contract: dict[str, Any]) -> dict[str, Any]:
 
     components: dict[str, dict[str, Any]] = pruned.get("components", {})
     skipped_refs = _reachable(pruned, skipped)
-    kept_roots: list[Any] = [pruned["paths"]]
+    kept_roots: list[Any] = [pruned["paths"], pruned.get("webhooks", {})]
     kept_roots += [
         node
         for section, entries in components.items()
@@ -324,6 +343,202 @@ def build_operations(contract: dict[str, Any]) -> list[dict[str, Any]]:
     return operations
 
 
+def _schema_name(node: object, where: str) -> str:
+    """The `components.schemas` name a `{"$ref": ...}` node points to."""
+    ref = node.get("$ref") if isinstance(node, dict) else None
+    if not isinstance(ref, str) or not ref.startswith(SCHEMAS):
+        raise SystemExit(
+            f"{where} must be a `$ref` to a schema in components.schemas, not {node!r}"
+        )
+    return ref.removeprefix(SCHEMAS)
+
+
+def _component_schema(contract: dict[str, Any], name: str, where: str) -> dict[str, Any]:
+    schema = contract.get("components", {}).get("schemas", {}).get(name)
+    if not isinstance(schema, dict):
+        raise SystemExit(f"{where} names the schema `{name}`, which components.schemas lacks.")
+    return schema
+
+
+def _constant(schema: dict[str, Any], prop: str) -> object:
+    """The single value a schema allows for one of its properties, or `None`."""
+    node = schema.get("properties", {}).get(prop)
+    if not isinstance(node, dict):
+        return None
+    if "const" in node:
+        return node["const"]
+    values = node.get("enum")
+    return values[0] if isinstance(values, list) and len(values) == 1 else None
+
+
+def stream_events(contract: dict[str, Any]) -> list[tuple[str, str]]:
+    """`(type, model name)` for each chat stream event, in the order the contract lists them.
+
+    Every `text/event-stream` success response must name, in `x-doctronic-event-schema`, the same
+    discriminated union on `type`, and each member's `type` must be the constant its mapping key
+    names.
+    """
+    unions: set[str] = set()
+    for path, method, operation in _iter_operations(contract):
+        for status, response in operation.get("responses", {}).items():
+            content = _resolve(contract, response).get("content") or {}
+            if not status.startswith("2") or "text/event-stream" not in content:
+                continue
+            operation_name = f"{method.upper()} {path}"
+            media = content["text/event-stream"]
+            if EVENT_SCHEMA not in media:
+                raise SystemExit(
+                    f"{operation_name} responds with `text/event-stream` but has no "
+                    f"`{EVENT_SCHEMA}`, so the generator can't type its events. The contract "
+                    "must name the schema of each event's JSON `data` there."
+                )
+            unions.add(_schema_name(media[EVENT_SCHEMA], f"`{EVENT_SCHEMA}` of {operation_name}"))
+    if not unions:
+        raise SystemExit(
+            f"No operation responds with `text/event-stream` and an `{EVENT_SCHEMA}`, so the "
+            "generator can't type the chat stream's events."
+        )
+    if len(unions) > 1:
+        raise SystemExit(
+            f"The `text/event-stream` operations name different `{EVENT_SCHEMA}` schemas "
+            f"({', '.join(sorted(unions))}). The SDK parses every stream with one union."
+        )
+    (union,) = unions
+    where = f"The event schema `{union}`"
+    schema = _component_schema(contract, union, f"`{EVENT_SCHEMA}`")
+    discriminator = schema.get("discriminator") or {}
+    mapping = discriminator.get("mapping")
+    members = schema.get("oneOf")
+    if (
+        discriminator.get("propertyName") != STREAM_DISCRIMINATOR
+        or not isinstance(mapping, dict)
+        or not isinstance(members, list)
+        or not members
+    ):
+        raise SystemExit(
+            f"{where} must be a `oneOf` with a `discriminator` on `{STREAM_DISCRIMINATOR}` that "
+            "maps each event type to its schema."
+        )
+    names = {
+        _schema_name({"$ref": ref}, f"{where}'s mapping for {event!r}"): event
+        for event, ref in mapping.items()
+    }
+    models = [_schema_name(member, f"A `oneOf` member of {where}") for member in members]
+    if len(names) != len(mapping) or set(names) != set(models) or len(set(models)) != len(models):
+        raise SystemExit(f"{where} must map each of its `oneOf` members to exactly one event type.")
+    events: list[tuple[str, str]] = []
+    for model in models:
+        event = names[model]
+        if _constant(_component_schema(contract, model, where), STREAM_DISCRIMINATOR) != event:
+            raise SystemExit(
+                f"`{model}` must set `{STREAM_DISCRIMINATOR}` to the constant {event!r}, the "
+                f"event type `{union}` maps to it."
+            )
+        events.append((event, model))
+    return events
+
+
+def webhook_events(contract: dict[str, Any]) -> list[tuple[str, str]]:
+    """`(event, payload model name)` for each entry of the contract's `webhooks`, in order.
+
+    Each webhook must be a `POST` that declares the signature header, with a JSON body whose
+    schema requires the envelope fields and sets `event` to the webhook's name.
+    """
+    webhooks = contract.get("webhooks")
+    if not isinstance(webhooks, dict) or not webhooks:
+        raise SystemExit(
+            "The contract has no `webhooks`, so the generator can't type webhook deliveries. "
+            "The contract must list each webhook's payload there."
+        )
+    events: list[tuple[str, str]] = []
+    for event, item in webhooks.items():
+        where = f"Webhook {event!r}"
+        operation = item.get("post") if isinstance(item, dict) else None
+        if not isinstance(operation, dict):
+            raise SystemExit(f"{where} has no `post` operation.")
+        parameters = [
+            _resolve(contract, parameter)
+            for parameter in [*item.get("parameters", []), *operation.get("parameters", [])]
+        ]
+        if not any(
+            parameter.get("in") == "header"
+            and str(parameter.get("name", "")).lower() == SIGNATURE_HEADER.lower()
+            and parameter.get("required") is True
+            for parameter in parameters
+        ):
+            raise SystemExit(f"{where} doesn't declare the required `{SIGNATURE_HEADER}` header.")
+        body = _resolve(contract, operation.get("requestBody") or {})
+        media = (body.get("content") or {}).get("application/json") or {}
+        model = _schema_name(media.get("schema"), f"{where}'s `application/json` body schema")
+        schema = _component_schema(contract, model, where)
+        missing = [name for name in WEBHOOK_ENVELOPE if name not in schema.get("required", [])]
+        if missing:
+            raise SystemExit(f"`{model}`, the payload of {where}, doesn't require {missing}.")
+        if _constant(schema, "event") != event:
+            raise SystemExit(f"`{model}`, the payload of {where}, must set `event` to {event!r}.")
+        events.append((event, model))
+    return events
+
+
+def _union_lines(name: str, models: list[str], doc: str) -> list[str]:
+    return [
+        f"{name}: TypeAlias = (",
+        *(f"    {'| ' if index else ''}{model}" for index, model in enumerate(models)),
+        ")",
+        f'"""{doc}"""',
+        "",
+    ]
+
+
+def _registry_lines(name: str, union: str, entries: list[tuple[str, str]], doc: str) -> list[str]:
+    return [
+        f"{name}: Final[dict[str, type[{union}]]] = {{",
+        *(f"    {json.dumps(key)}: {model}," for key, model in entries),
+        "}",
+        f'"""{doc}"""',
+        "",
+    ]
+
+
+def render_events(stream: list[tuple[str, str]], webhooks: list[tuple[str, str]]) -> str:
+    imported = sorted({model for _, model in [*stream, *webhooks]})
+    lines = [
+        f"# {HEADER}",
+        "",
+        "from __future__ import annotations",
+        "",
+        "from typing import Final, TypeAlias",
+        "",
+        "from .models import (",
+        *(f"    {model}," for model in imported),
+        ")",
+        "",
+        *_union_lines(
+            "KnownChatStreamEvent",
+            [model for _, model in stream],
+            f"Every member of the union the stream's `{EVENT_SCHEMA}` names.",
+        ),
+        *_registry_lines(
+            "STREAM_EVENTS",
+            "KnownChatStreamEvent",
+            stream,
+            "The model of each stream event, by its `type` (the SSE `event:` name).",
+        ),
+        *_union_lines(
+            "KnownWebhookEvent",
+            [model for _, model in webhooks],
+            "The payload of every webhook in the contract's `webhooks`.",
+        ),
+        *_registry_lines(
+            "WEBHOOK_EVENTS",
+            "KnownWebhookEvent",
+            webhooks,
+            "The payload model of each webhook, by its `event`.",
+        ),
+    ]
+    return "\n".join(lines)
+
+
 def render_operations(contract: dict[str, Any], operations: list[dict[str, Any]]) -> str:
     lines = [
         f"# {HEADER}",
@@ -384,21 +599,29 @@ def main() -> None:
 
     contract = load_contract(args.contract)
     operations = build_operations(contract)
+    organization = organization_contract(contract)
+    # Checked before anything is written, so a contract without them leaves the output as it was.
+    stream, webhooks = stream_events(organization), webhook_events(organization)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUTPUT_DIR / "__init__.py").write_text(f'"""{HEADER}"""\n', encoding="utf-8")
     models = OUTPUT_DIR / "models.py"
-    generate_models(organization_contract(contract), models)
+    generate_models(organization, models)
     operations_file = OUTPUT_DIR / "operations.py"
     operations_file.write_text(render_operations(contract, operations), encoding="utf-8")
+    events_file = OUTPUT_DIR / "events.py"
+    events_file.write_text(render_events(stream, webhooks), encoding="utf-8")
 
-    files = [str(models), str(operations_file)]
+    files = [str(models), str(operations_file), str(events_file)]
     subprocess.run([sys.executable, "-m", "ruff", "format", "--quiet", *files], check=True)
     shown = (
         PINNED_CONTRACT.relative_to(ROOT)
         if args.contract == str(PINNED_CONTRACT)
         else args.contract
     )
-    print(f"Generated models and {len(operations)} operations from {shown}")
+    print(
+        f"Generated models, {len(operations)} operations, {len(stream)} stream events, and "
+        f"{len(webhooks)} webhooks from {shown}"
+    )
     for method, path in skipped_operations(contract):
         print(f"Skipped {method} {path}: its security doesn't use {ORGANIZATION_SCHEME}")
 

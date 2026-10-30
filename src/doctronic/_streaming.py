@@ -1,5 +1,8 @@
 """Chat stream: the Server-Sent Events parser, typed events, and the stream objects.
 
+The event models are generated from the contract; `_generated/events.py` maps each event type to
+its model.
+
 The parser is the reference parser from the streaming guide. It handles frames split across
 network chunks; CRLF, LF, and CR line endings; comment lines; multiline `data` fields; and a
 truncated final frame, which it drops.
@@ -15,14 +18,26 @@ import socket
 from collections.abc import AsyncGenerator, AsyncIterator, Coroutine, Generator, Iterator
 from dataclasses import dataclass, field
 from types import TracebackType
-from typing import Any, Literal, NamedTuple, TypeAlias, cast
+from typing import Any, NamedTuple, TypeAlias, cast
 
 import httpx
 import pydantic
-from pydantic import BaseModel, ConfigDict
-from pydantic.alias_generators import to_camel
+from pydantic import BaseModel
 
 from ._errors import APIConnectionError, APITimeoutError, APIUserAbortError, DoctronicError
+from ._generated.events import STREAM_EVENTS, KnownChatStreamEvent
+from ._generated.models import (
+    ConsultationArtifacts,
+    StreamChatConsultationCompleteEvent,
+    StreamChatConversationEndEvent,
+    StreamChatConversationOfftopicEvent,
+    StreamChatCTAEvent,
+    StreamChatErrorEvent,
+    StreamChatGuardianEvent,
+    StreamChatMessageContentEvent,
+    StreamChatMessageStartEvent,
+    StreamChatMessageStopEvent,
+)
 
 __all__ = [
     "AiConsultationCompleteEvent",
@@ -97,88 +112,17 @@ class SSEDecoder:
     # ends was cut off mid-frame, so there is no `flush()`: it is dropped, never parsed.
 
 
-class _EventModel(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="allow")
-
-
-class MessageStartEvent(_EventModel):
-    """Start a message with this `role` and `message_id`."""
-
-    type: Literal["message.start"] = "message.start"
-    role: str
-    message_id: str
-    message_timestamp: int | float | None = None
-
-
-class MessageContentEvent(_EventModel):
-    """Append `content` to the message with the same `message_id`."""
-
-    type: Literal["message.content"] = "message.content"
-    message_id: str
-    content: str
-
-
-class MessageStopEvent(_EventModel):
-    """The message is complete. The turn and the consultation continue."""
-
-    type: Literal["message.stop"] = "message.stop"
-    message_id: str
-
-
-class GuardianEvent(_EventModel):
-    """Run your approved safety behavior and log the stable `guardian_id`."""
-
-    type: Literal["guardian"] = "guardian"
-    guardian_id: str
-    message: str
-
-
-class ConversationOfftopicEvent(_EventModel):
-    """The patient's message was classified as off-topic. Keep reading the stream."""
-
-    type: Literal["conversation.offtopic"] = "conversation.offtopic"
-    message_id: str | None = None
-
-
-class ConversationEndEvent(_EventModel):
-    """The assistant ended the conversation. `reason` explains why when supplied."""
-
-    type: Literal["conversation.end"] = "conversation.end"
-    message_id: str | None = None
-    reason: str | None = None
-
-
-class SkillCodeCtaEvent(_EventModel):
-    """An end-of-flow call to action. Use `text` as the label when present."""
-
-    type: Literal["skill_code.cta"] = "skill_code.cta"
-    skill_code: str
-    widget: str
-    text: str | None = None
-
-
-class ConsultationArtifacts(_EventModel):
-    """Consultation document IDs. `None` means that document wasn't generated."""
-
-    long_summary: str | None = None
-    short_summary: str | None = None
-    soap_note: str | None = None
-
-
-class AiConsultationCompleteEvent(_EventModel):
-    """The consultation is complete. Store each non-null artifact ID."""
-
-    type: Literal["ai_consultation.complete"] = "ai_consultation.complete"
-    artifacts: ConsultationArtifacts
-
-
-class StreamErrorEvent(_EventModel):
-    """A recoverable stream error. Don't resend the turn automatically; check the transcript."""
-
-    type: Literal["error"] = "error"
-    error_code: str
-    message: str
-    retry_after_seconds: int | float | None = None
+# The models are generated from the contract's `StreamChatEvent`. These are the names the SDK has
+# used for them since 0.1.0; `doctronic.types` exports both.
+MessageStartEvent = StreamChatMessageStartEvent
+MessageContentEvent = StreamChatMessageContentEvent
+MessageStopEvent = StreamChatMessageStopEvent
+GuardianEvent = StreamChatGuardianEvent
+ConversationOfftopicEvent = StreamChatConversationOfftopicEvent
+ConversationEndEvent = StreamChatConversationEndEvent
+SkillCodeCtaEvent = StreamChatCTAEvent
+AiConsultationCompleteEvent = StreamChatConsultationCompleteEvent
+StreamErrorEvent = StreamChatErrorEvent
 
 
 class UnknownChatStreamEvent(BaseModel):
@@ -191,33 +135,8 @@ class UnknownChatStreamEvent(BaseModel):
     data: Any = None
 
 
-KnownChatStreamEvent: TypeAlias = (
-    MessageStartEvent
-    | MessageContentEvent
-    | MessageStopEvent
-    | GuardianEvent
-    | ConversationOfftopicEvent
-    | ConversationEndEvent
-    | SkillCodeCtaEvent
-    | AiConsultationCompleteEvent
-    | StreamErrorEvent
-)
-"""Every event type the stream documents."""
-
 ChatStreamEvent: TypeAlias = KnownChatStreamEvent | UnknownChatStreamEvent
 """A chat stream event. Narrow it with `isinstance`; new event types are `UnknownChatStreamEvent`."""
-
-_EVENT_TYPES: dict[str, type[_EventModel]] = {
-    "message.start": MessageStartEvent,
-    "message.content": MessageContentEvent,
-    "message.stop": MessageStopEvent,
-    "guardian": GuardianEvent,
-    "conversation.offtopic": ConversationOfftopicEvent,
-    "conversation.end": ConversationEndEvent,
-    "skill_code.cta": SkillCodeCtaEvent,
-    "ai_consultation.complete": AiConsultationCompleteEvent,
-    "error": StreamErrorEvent,
-}
 
 
 def parse_event(frame: SSEFrame) -> ChatStreamEvent:
@@ -229,7 +148,7 @@ def parse_event(frame: SSEFrame) -> ChatStreamEvent:
     name = frame.event
     if name == "message" and isinstance(payload, dict) and isinstance(payload.get("type"), str):
         name = payload["type"]  # A frame without an `event:` line; fall back to the payload.
-    model = _EVENT_TYPES.get(name)
+    model = STREAM_EVENTS.get(name)
     if model is None or not isinstance(payload, dict):
         return UnknownChatStreamEvent(type=name, data=payload)
     try:
@@ -244,7 +163,7 @@ class StreamedMessage:
 
     message_id: str
     role: str
-    """The role from `message.start`."""
+    """The role from `message.start`, as a plain string such as `"assistant"`."""
     content: str = ""
     message_timestamp: int | float | None = None
     complete: bool = False
@@ -269,7 +188,7 @@ class _Accumulator:
     def add(self, event: ChatStreamEvent) -> None:
         if isinstance(event, MessageStartEvent):
             self._messages[event.message_id] = StreamedMessage(
-                event.message_id, event.role, message_timestamp=event.message_timestamp
+                event.message_id, event.role.value, message_timestamp=event.message_timestamp
             )
         elif isinstance(event, MessageContentEvent):
             # Content for a message whose `message.start` never arrived has no role; like the

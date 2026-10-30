@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import random
+from typing import Any, get_args
 
 import httpx
 import pytest
@@ -21,17 +22,31 @@ from doctronic import (
     Doctronic,
     ServiceUnavailableError,
 )
+from doctronic._generated.events import STREAM_EVENTS
 from doctronic._streaming import SSEDecoder, SSEFrame, decode_frame, parse_event
 from doctronic.types import (
     AiConsultationCompleteEvent,
     ChatStreamEvent,
+    ConsultationArtifacts,
     ConversationEndEvent,
     ConversationOfftopicEvent,
+    GuardianCategory,
     GuardianEvent,
+    KnownChatStreamEvent,
     MessageContentEvent,
     MessageStartEvent,
     MessageStopEvent,
+    PartnerGuardianId,
     SkillCodeCtaEvent,
+    StreamChatConsultationCompleteEvent,
+    StreamChatConversationEndEvent,
+    StreamChatConversationOfftopicEvent,
+    StreamChatCTAEvent,
+    StreamChatErrorEvent,
+    StreamChatGuardianEvent,
+    StreamChatMessageContentEvent,
+    StreamChatMessageStartEvent,
+    StreamChatMessageStopEvent,
     StreamErrorEvent,
     UnknownChatStreamEvent,
 )
@@ -44,6 +59,7 @@ from tests.helpers import (
     error,
     ok,
     open_stream,
+    pinned_contract,
     recorded_stream,
     resolve,
     sse_response,
@@ -191,6 +207,171 @@ def test_events_keep_extra_fields_and_round_trip_to_the_wire_shape() -> None:
     assert event.model_dump(by_alias=True, exclude_none=True) == payload
 
 
+# The models generated from the contract's `StreamChatEvent`.
+
+GUARDIAN_NEW_ID: dict[str, Any] = {
+    "type": "guardian",
+    "guardianId": "brand_new_detector",
+    "message": "",
+    "endsConversation": False,
+    "category": "brand_new_category",
+}
+COMPLETE_WITH_NULLS: dict[str, Any] = {
+    "type": "ai_consultation.complete",
+    "artifacts": {"longSummary": None, "shortSummary": None, "soapNote": None},
+}
+
+
+def frame(payload: dict[str, Any]) -> SSEFrame:
+    return SSEFrame(str(payload["type"]), json.dumps(payload))
+
+
+def sse(*payloads: dict[str, Any]) -> bytes:
+    return b"".join(
+        f"event: {payload['type']}\ndata: {json.dumps(payload)}\n\n".encode()
+        for payload in payloads
+    )
+
+
+def test_the_event_classes_are_the_generated_models() -> None:
+    assert (
+        MessageStartEvent,
+        MessageContentEvent,
+        MessageStopEvent,
+        GuardianEvent,
+        ConversationOfftopicEvent,
+        ConversationEndEvent,
+        SkillCodeCtaEvent,
+        AiConsultationCompleteEvent,
+        StreamErrorEvent,
+    ) == (
+        StreamChatMessageStartEvent,
+        StreamChatMessageContentEvent,
+        StreamChatMessageStopEvent,
+        StreamChatGuardianEvent,
+        StreamChatConversationOfftopicEvent,
+        StreamChatConversationEndEvent,
+        StreamChatCTAEvent,
+        StreamChatConsultationCompleteEvent,
+        StreamChatErrorEvent,
+    )
+    assert set(get_args(KnownChatStreamEvent)) == set(STREAM_EVENTS.values())
+    for name, model in STREAM_EVENTS.items():
+        assert model.model_fields["type"].default == name
+
+
+def test_every_documented_stream_example_parses_into_its_model() -> None:
+    media = pinned_contract()["paths"]["/chats/{chatId}/stream/"]["post"]["responses"]["200"][
+        "content"
+    ]["text/event-stream"]
+
+    for name, example in media["examples"].items():
+        (event,) = parse_chunks([example["value"].encode()])
+        assert isinstance(event, STREAM_EVENTS[event.type]), name
+
+
+def test_guardian_event_has_the_contract_fields() -> None:
+    event = parse_event(
+        frame(
+            {
+                "type": "guardian",
+                "guardianId": "harmful_content_detector",
+                "message": "I'm not able to help with that topic.",
+                "title": "Let's stay on health",
+                "text": "Ask me a health question.",
+                "endsConversation": True,
+                "category": "safety",
+            }
+        )
+    )
+
+    assert isinstance(event, GuardianEvent)
+    assert event.guardian_id == PartnerGuardianId.harmful_content_detector
+    assert type(event.guardian_id) is str  # The wire string, as in 0.1, so logs read the same.
+    assert (event.title, event.text, event.ends_conversation) == (
+        "Let's stay on health",
+        "Ask me a health question.",
+        True,
+    )
+    assert event.category == GuardianCategory.safety
+
+
+def test_unknown_guardian_id_and_category_still_parse() -> None:
+    event = parse_event(frame(GUARDIAN_NEW_ID))
+
+    assert isinstance(event, GuardianEvent)
+    assert event.guardian_id == "brand_new_detector"
+    assert event.category == "brand_new_category"
+    assert event.model_dump(by_alias=True, exclude_none=True) == GUARDIAN_NEW_ID
+
+
+def test_guardian_event_without_the_optional_fields_gets_the_contract_defaults() -> None:
+    event = parse_event(frame({"type": "guardian", "guardianId": "emergency_breathing"}))
+
+    assert isinstance(event, GuardianEvent)
+    assert (event.message, event.title, event.text, event.ends_conversation) == (
+        "",
+        None,
+        None,
+        False,
+    )
+    assert event.category == GuardianCategory.other
+
+
+def test_consultation_complete_with_null_artifacts() -> None:
+    event = parse_event(frame(COMPLETE_WITH_NULLS))
+
+    assert isinstance(event, AiConsultationCompleteEvent)
+    assert event.artifacts == ConsultationArtifacts(
+        long_summary=None, short_summary=None, soap_note=None
+    )
+    assert event.model_dump(by_alias=True) == COMPLETE_WITH_NULLS
+
+
+def test_consultation_complete_without_artifact_keys_reads_them_as_null() -> None:
+    event = parse_event(frame({"type": "ai_consultation.complete", "artifacts": {}}))
+
+    assert isinstance(event, AiConsultationCompleteEvent)
+    assert (event.artifacts.long_summary, event.artifacts.soap_note) == (None, None)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"type": "ai_consultation.complete", "artifacts": None},
+        {"type": "ai_consultation.complete"},
+        {"type": "skill_code.cta", "widget": "w"},
+        {"type": "error", "errorCode": "error.internal", "message": "x", "retryAfterSeconds": 1.5},
+    ],
+    ids=["null-artifacts-object", "no-artifacts", "cta-without-skill-code", "fractional-retry"],
+)
+def test_a_known_event_the_contract_rejects_is_unknown(payload: dict[str, Any]) -> None:
+    assert parse_event(frame(payload)) == UnknownChatStreamEvent(
+        type=str(payload["type"]), data=payload
+    )
+
+
+def test_message_role_is_an_open_enum() -> None:
+    user = parse_event(frame({"type": "message.start", "role": "user", "messageId": "m1"}))
+    narrator = parse_event(frame({"type": "message.start", "role": "narrator", "messageId": "m2"}))
+    default = parse_event(frame({"type": "message.start", "messageId": "m3"}))
+
+    assert isinstance(user, MessageStartEvent)
+    assert user.role == "user"
+    assert isinstance(narrator, MessageStartEvent)
+    assert narrator.role == "narrator"
+    assert isinstance(default, MessageStartEvent)
+    assert default.role == "assistant"
+
+
+def test_skill_code_cta_without_a_widget() -> None:
+    event = parse_event(frame({"type": "skill_code.cta", "skillCode": "109"}))
+
+    assert event == SkillCodeCtaEvent(skill_code="109")
+    assert isinstance(event, SkillCodeCtaEvent)
+    assert event.widget is None
+
+
 # Through the client, sync and async.
 
 
@@ -246,6 +427,7 @@ async def test_final_messages_assembles_by_message_id(
     final = await resolve(stream.final_messages())
 
     assert final.messages[0].message_timestamp == 1741856873000
+    assert type(final.messages[0].role) is str  # The plain string, as in 0.1.
     assert [(m.message_id, m.role, m.content, m.complete) for m in final.messages] == [
         (
             "ac_hist_01",
@@ -285,6 +467,22 @@ async def test_final_messages_marks_messages_cut_off(
     assert [(m.message_id, m.content, m.complete) for m in final.messages] == [
         ("m1", "Partial", False)
     ]
+
+
+@pytest.mark.asyncio
+async def test_contract_events_through_the_client(client: AnyClient, api: respx.MockRouter) -> None:
+    future: dict[str, Any] = {"type": "conversation.handoff", "to": "clinician"}
+    mock_stream(api, [sse(GUARDIAN_NEW_ID, COMPLETE_WITH_NULLS, future)])
+    stream = await open_stream(client.for_user(USER_ID).chats.stream("chat_01", user_input="Hi"))
+
+    final = await resolve(stream.final_messages())
+
+    guardian, complete, unknown = final.control_events
+    assert isinstance(guardian, GuardianEvent)
+    assert (guardian.guardian_id, guardian.category) == ("brand_new_detector", "brand_new_category")
+    assert isinstance(complete, AiConsultationCompleteEvent)
+    assert complete.artifacts.short_summary is None
+    assert unknown == UnknownChatStreamEvent(type="conversation.handoff", data=future)
 
 
 @pytest.mark.asyncio

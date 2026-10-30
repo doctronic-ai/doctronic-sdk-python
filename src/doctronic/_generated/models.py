@@ -149,6 +149,17 @@ class ArtifactContent(BaseModel):
     body: str
 
 
+class ArtifactType(str, Enum):
+    """
+    Organization-retrievable consultation artifact kinds.
+    """
+
+    long_summary = "long_summary"
+    short_summary = "short_summary"
+    soap_note = "soap_note"
+    clinician_note = "clinician_note"
+
+
 class AvailableSlotsResponse(BaseModel):
     model_config = ConfigDict(
         extra="allow",
@@ -227,6 +238,12 @@ ConversationPromptContext = TypeAliasType(
 )
 
 
+StarterPromptIndex = TypeAliasType("StarterPromptIndex", Annotated[int, Field(ge=0)])
+"""
+Embed sessions only: the index, in `content.starterPrompts` of `GET /embed/config/`, of the starter prompt the visitor picked to start this chat. Omit it when the visitor typed their own question.
+"""
+
+
 class CreateChatRequest(BaseModel):
     model_config = ConfigDict(
         extra="allow",
@@ -236,6 +253,12 @@ class CreateChatRequest(BaseModel):
     conversation_prompt_context: Annotated[
         ConversationPromptContext | None, Field(alias="conversationPromptContext")
     ] = None
+    starter_prompt_index: Annotated[
+        StarterPromptIndex | None, Field(alias="starterPromptIndex")
+    ] = None
+    """
+    Embed sessions only: the index, in `content.starterPrompts` of `GET /embed/config/`, of the starter prompt the visitor picked to start this chat. Omit it when the visitor typed their own question.
+    """
 
 
 FirstName = TypeAliasType("FirstName", Annotated[str, Field(max_length=50)])
@@ -333,6 +356,39 @@ class PharmacyAddress(BaseModel):
     postal_code: Annotated[str | None, Field(alias="postalCode")] = None
 
 
+Line21 = TypeAliasType("Line21", Annotated[str, Field(max_length=128, min_length=1)])
+
+
+City1 = TypeAliasType("City1", Annotated[str, Field(max_length=100, min_length=1)])
+
+
+PostalCode1 = TypeAliasType(
+    "PostalCode1", Annotated[str, Field(pattern="^[0-9]{5}(?:-?[0-9]{4})?$")]
+)
+
+
+class PharmacySearchAddress(BaseModel):
+    """
+    Optional narrowing filter for the pharmacy's address, not the patient's.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    line1: Annotated[str, Field(max_length=256, min_length=1)]
+    line2: Line21 | None = None
+    city: City1 | None = None
+    state: str | None = None
+    postal_code: Annotated[PostalCode1 | None, Field(alias="postalCode")] = None
+
+
+PhoneNumber = TypeAliasType("PhoneNumber", Annotated[str, Field(max_length=40)])
+"""
+Pharmacy phone, optionally prefixed with +1. Overrides searchTerm; filters nearby Canvas results.
+"""
+
+
 class PharmacySearchRequest(BaseModel):
     """
     Request body for searching pharmacies, used to route any prescriptions resulting
@@ -340,7 +396,8 @@ class PharmacySearchRequest(BaseModel):
 
     `latitude` and `longitude` are always required. `search_term` is optional; when
     omitted, results are sorted by proximity to the given location. `state` optionally
-    filters results to a single US state.
+    filters results to a single US state. When `phone_number` is supplied,
+    search by proximity without a name filter, then compare normalized phones.
     """
 
     model_config = ConfigDict(
@@ -362,6 +419,14 @@ class PharmacySearchRequest(BaseModel):
     state: str | None = None
     """
     US state code, e.g. 'NY', where the pharmacy is located.
+    """
+    phone_number: Annotated[PhoneNumber | None, Field(alias="phoneNumber")] = None
+    """
+    Pharmacy phone, optionally prefixed with +1. Overrides searchTerm; filters nearby Canvas results.
+    """
+    address: PharmacySearchAddress | None = None
+    """
+    Pharmacy address to narrow results. All supplied fields must match; line1 is required.
     """
 
 
@@ -691,11 +756,11 @@ class ValidationErrorResponse(BaseModel):
         extra="allow",
         populate_by_name=True,
     )
-    code: Literal["error.validation_error"]
+    code: Literal["error.validation_error"] = "error.validation_error"
     """
     Stable validation error code.
     """
-    message: Literal["Validation error"]
+    message: Literal["Validation error"] = "Validation error"
     """
     Human-readable error summary.
     """
@@ -703,6 +768,356 @@ class ValidationErrorResponse(BaseModel):
     """
     One entry for each request validation failure.
     """
+
+
+class ConsultationArtifacts(BaseModel):
+    """
+    IDs of the consultation's documents, for `GET /artifacts/{artifactId}/`; `null` when one isn't available.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    long_summary: Annotated[str | None, Field(alias="longSummary")] = None
+    short_summary: Annotated[str | None, Field(alias="shortSummary")] = None
+    soap_note: Annotated[str | None, Field(alias="soapNote")] = None
+
+
+class GuardianCategory(str, Enum):
+    emergency = "emergency"
+    safety = "safety"
+    feedback = "feedback"
+    other = "other"
+
+
+class PartnerGuardianId(str, Enum):
+    emergency_acute_aortic_dissection_or_ruptured_aortic_aneurysm = (
+        "emergency_acute_aortic_dissection_or_ruptured_aortic_aneurysm"
+    )
+    emergency_acute_coronary_syndrome = "emergency_acute_coronary_syndrome"
+    emergency_breathing = "emergency_breathing"
+    emergency_cerebrovascular_accident_or_stroke = "emergency_cerebrovascular_accident_or_stroke"
+    emergency_constant_bleeding = "emergency_constant_bleeding"
+    emergency_crushing_chest_pain = "emergency_crushing_chest_pain"
+    emergency_domestic_abuse = "emergency_domestic_abuse"
+    emergency_exact_words = "emergency_exact_words"
+    emergency_harm_others = "emergency_harm_others"
+    emergency_major_trauma = "emergency_major_trauma"
+    emergency_psychotic_event = "emergency_psychotic_event"
+    emergency_seizure = "emergency_seizure"
+    emergency_self_harm = "emergency_self_harm"
+    emergency_severe_abdominal_pain = "emergency_severe_abdominal_pain"
+    emergency_shortness_of_breath = "emergency_shortness_of_breath"
+    emergency_stroke = "emergency_stroke"
+    emergency_venomous_bite = "emergency_venomous_bite"
+    emergency_worst_headache = "emergency_worst_headache"
+    agent_feedback_negative = "agent_feedback_negative"
+    agent_feedback_positive = "agent_feedback_positive"
+    check_emergency_phrase = "check_emergency_phrase"
+    check_input_language = "check_input_language"
+    custom_guardians_gateway = "custom_guardians_gateway"
+    security_gateway = "security_gateway"
+    extraction_decomposition_detector = "extraction_decomposition_detector"
+    harmful_content_detector = "harmful_content_detector"
+    identity_instruction_attack_detector = "identity_instruction_attack_detector"
+    policy_violation = "policy_violation"
+    prompt_injection = "prompt_injection"
+    uncommon_message = "uncommon_message"
+    unified_emergency_detector = "unified_emergency_detector"
+
+
+class StreamChatCTAEvent(BaseModel):
+    """
+    An end-of-flow call to action. Use `text` as its label when present.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    type: Literal["skill_code.cta"] = "skill_code.cta"
+    skill_code: Annotated[str, Field(alias="skillCode")]
+    widget: str | None = None
+    text: str | None = None
+
+
+class StreamChatConsultationCompleteEvent(BaseModel):
+    """
+    The consultation is complete. `artifacts` holds the IDs of its documents.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    type: Literal["ai_consultation.complete"] = "ai_consultation.complete"
+    artifacts: ConsultationArtifacts
+
+
+class StreamChatConversationEndEvent(BaseModel):
+    """
+    The assistant ended the conversation; `reason` explains why when present.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    type: Literal["conversation.end"] = "conversation.end"
+    message_id: Annotated[str | None, Field(alias="messageId")] = None
+    reason: str | None = None
+
+
+class StreamChatConversationOfftopicEvent(BaseModel):
+    """
+    The user's message was classified as off-topic.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    type: Literal["conversation.offtopic"] = "conversation.offtopic"
+    message_id: Annotated[str | None, Field(alias="messageId")] = None
+
+
+class StreamChatErrorEvent(BaseModel):
+    """
+    An error; the stream ends after it. Don't resend the turn automatically: it may already have produced work.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    type: Literal["error"] = "error"
+    error_code: Annotated[str, Field(alias="errorCode")]
+    message: str
+    retry_after_seconds: Annotated[int | None, Field(alias="retryAfterSeconds")] = None
+
+
+class StreamChatGuardianEvent(BaseModel):
+    """
+    A safety condition was detected. Show `title` and `text` when present. When `endsConversation` is true, stop
+    input but keep reading until `conversation.end`. Treat a repeated `guardianId` in the same turn as an update.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    type: Literal["guardian"] = "guardian"
+    guardian_id: Annotated[PartnerGuardianId | str, Field(alias="guardianId")]
+    message: str = ""
+    title: str | None = None
+    text: str | None = None
+    ends_conversation: Annotated[bool, Field(alias="endsConversation")] = False
+    category: GuardianCategory | str = GuardianCategory.other
+
+
+class StreamChatMessageContentEvent(BaseModel):
+    """
+    A chunk of the message's text: append it to the message with the same `messageId`.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    type: Literal["message.content"] = "message.content"
+    message_id: Annotated[str, Field(alias="messageId")]
+    content: str
+
+
+class Role1(str, Enum):
+    assistant = "assistant"
+    user = "user"
+
+
+class StreamChatMessageStartEvent(BaseModel):
+    """
+    A message started. Its text follows in `message.content` events with the same `messageId`.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    type: Literal["message.start"] = "message.start"
+    role: Role1 = Role1.assistant
+    message_id: Annotated[str, Field(alias="messageId")]
+    message_timestamp: Annotated[int | None, Field(alias="messageTimestamp")] = None
+    """
+    When the message started, in epoch milliseconds.
+    """
+
+
+class StreamChatMessageStopEvent(BaseModel):
+    """
+    The message with this `messageId` is complete. The turn can go on with more messages.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    type: Literal["message.stop"] = "message.stop"
+    message_id: Annotated[str, Field(alias="messageId")]
+
+
+StreamChatEvent = TypeAliasType(
+    "StreamChatEvent",
+    Annotated[
+        StreamChatMessageStartEvent
+        | StreamChatMessageContentEvent
+        | StreamChatMessageStopEvent
+        | StreamChatConversationEndEvent
+        | StreamChatConversationOfftopicEvent
+        | StreamChatGuardianEvent
+        | StreamChatErrorEvent
+        | StreamChatCTAEvent
+        | StreamChatConsultationCompleteEvent,
+        Field(discriminator="type", title="StreamChatEvent"),
+    ],
+)
+"""
+The JSON `data` of one event of `POST /chats/{chatId}/stream/`, keyed on `type`, which matches the SSE `event:` name. New event types may be added: ignore types you don't recognize.
+"""
+
+
+class AppointmentCallEndedData(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    appointment_id: Annotated[str, Field(alias="appointmentId")]
+    user_id: Annotated[str, Field(alias="userId")]
+
+
+class AppointmentCallEndedPayload(BaseModel):
+    """
+    The appointment's call ended.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    event_id: Annotated[str, Field(alias="eventId")]
+    """
+    Unique ID of the event, the same on every delivery attempt. Deduplicate on it.
+    """
+    occurred_at: Annotated[datetime, Field(alias="occurredAt")]
+    """
+    When the event happened (UTC), not when this attempt was sent.
+    """
+    event: Literal["appointment.call_ended"] = "appointment.call_ended"
+    data: AppointmentCallEndedData
+
+
+class AppointmentPractitionerJoinedData(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    appointment_id: Annotated[str, Field(alias="appointmentId")]
+    user_id: Annotated[str, Field(alias="userId")]
+
+
+class AppointmentPractitionerJoinedPayload(BaseModel):
+    """
+    A practitioner joined the appointment's call.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    event_id: Annotated[str, Field(alias="eventId")]
+    """
+    Unique ID of the event, the same on every delivery attempt. Deduplicate on it.
+    """
+    occurred_at: Annotated[datetime, Field(alias="occurredAt")]
+    """
+    When the event happened (UTC), not when this attempt was sent.
+    """
+    event: Literal["appointment.practitioner_joined"] = "appointment.practitioner_joined"
+    data: AppointmentPractitionerJoinedData
+
+
+class AppointmentWaitingRoomReadyData(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    appointment_id: Annotated[str, Field(alias="appointmentId")]
+    user_id: Annotated[str, Field(alias="userId")]
+    waiting_room_url: Annotated[
+        str,
+        Field(
+            alias="waitingRoomUrl",
+            examples=["https://dctd.co/r/example/"],
+            max_length=2083,
+            min_length=1,
+        ),
+    ]
+    """
+    HTTPS URL for joining the appointment; currently expires one hour after issuance and may rotate when reissued.
+    """
+
+
+class AppointmentWaitingRoomReadyPayload(BaseModel):
+    """
+    The appointment's waiting room is ready to join. Replace any `waitingRoomUrl` you stored for it earlier.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    event_id: Annotated[str, Field(alias="eventId")]
+    """
+    Unique ID of the event, the same on every delivery attempt. Deduplicate on it.
+    """
+    occurred_at: Annotated[datetime, Field(alias="occurredAt")]
+    """
+    When the event happened (UTC), not when this attempt was sent.
+    """
+    event: Literal["appointment.waiting_room_ready"] = "appointment.waiting_room_ready"
+    data: AppointmentWaitingRoomReadyData
+
+
+class ArtifactReadyData(BaseModel):
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    artifact_id: Annotated[str, Field(alias="artifactId")]
+    artifact_type: Annotated[ArtifactType, Field(alias="artifactType")]
+    chat_id: Annotated[str, Field(alias="chatId")]
+    user_id: Annotated[str | None, Field(alias="userId")]
+
+
+class ArtifactReadyPayload(BaseModel):
+    """
+    A consultation document is ready to retrieve with `GET /artifacts/{artifactId}/`. `userId` can be null.
+    """
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+    event_id: Annotated[str, Field(alias="eventId")]
+    """
+    Unique ID of the event, the same on every delivery attempt. Deduplicate on it.
+    """
+    occurred_at: Annotated[datetime, Field(alias="occurredAt")]
+    """
+    When the event happened (UTC), not when this attempt was sent.
+    """
+    event: Literal["artifact.ready"] = "artifact.ready"
+    data: ArtifactReadyData
 
 
 MessagePromptContext = TypeAliasType(
