@@ -238,12 +238,6 @@ ConversationPromptContext = TypeAliasType(
 )
 
 
-StarterPromptIndex = TypeAliasType("StarterPromptIndex", Annotated[int, Field(ge=0)])
-"""
-Embed sessions only: the index, in `content.starterPrompts` of `GET /embed/config/`, of the starter prompt the visitor picked to start this chat. Omit it when the visitor typed their own question.
-"""
-
-
 class CreateChatRequest(BaseModel):
     model_config = ConfigDict(
         extra="allow",
@@ -253,12 +247,6 @@ class CreateChatRequest(BaseModel):
     conversation_prompt_context: Annotated[
         ConversationPromptContext | None, Field(alias="conversationPromptContext")
     ] = None
-    starter_prompt_index: Annotated[
-        StarterPromptIndex | None, Field(alias="starterPromptIndex")
-    ] = None
-    """
-    Embed sessions only: the index, in `content.starterPrompts` of `GET /embed/config/`, of the starter prompt the visitor picked to start this chat. Omit it when the visitor typed their own question.
-    """
 
 
 FirstName = TypeAliasType("FirstName", Annotated[str, Field(max_length=50)])

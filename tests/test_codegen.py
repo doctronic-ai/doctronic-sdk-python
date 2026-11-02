@@ -111,10 +111,7 @@ def test_the_pinned_contract_gives_the_committed_operations() -> None:
 def test_the_pinned_contract_is_the_default() -> None:
     assert Path(generate.PINNED_CONTRACT) == ROOT / "openapi" / "doctronic-v1.json"
     assert pinned_contract()["info"]["version"] == CONTRACT_VERSION
-    # The embed operations take a browser session token, not the organization API token.
-    skipped = generate.skipped_operations(pinned_contract())
-    assert skipped
-    assert all(path.startswith("/embed/") for _, path in skipped)
+    assert generate.skipped_operations(pinned_contract()) == []
 
 
 def test_operations_without_organization_security_are_skipped() -> None:
