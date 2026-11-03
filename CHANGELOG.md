@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-11-03)
 
 A minor release. Built from the contract with `info.version` 1.0.0 (22 operations), the first to
 publish the chat stream's event schemas and the webhook payloads.
