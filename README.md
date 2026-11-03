@@ -57,7 +57,7 @@ with patient.chats.stream(
 ) as stream:
     for event in stream:
         if isinstance(event, MessageStartEvent):
-            messages[event.message_id] = {"role": event.role, "text": ""}
+            messages[event.message_id] = {"role": event.role.value, "text": ""}
         elif isinstance(event, MessageContentEvent):
             messages[event.message_id]["text"] += event.content
         elif isinstance(event, MessageStopEvent):
@@ -204,12 +204,16 @@ stream closed before its end, so a cancelled turn never looks finished. On `Asyn
 cancelling the reading task also releases the connection; the `asyncio.CancelledError`
 propagates unchanged.
 
+The event classes are generated from the contract's `StreamChatEvent` schema. `doctronic.types`
+exports each one under the name below and under its contract name, such as
+`StreamChatMessageStartEvent`.
+
 | Event | Class | Fields |
 | --- | --- | --- |
 | `message.start` | `MessageStartEvent` | `role`, `message_id`, `message_timestamp` |
 | `message.content` | `MessageContentEvent` | `message_id`, `content` |
 | `message.stop` | `MessageStopEvent` | `message_id` |
-| `guardian` | `GuardianEvent` | `guardian_id`, `message` |
+| `guardian` | `GuardianEvent` | `guardian_id`, `message`, `title`, `text`, `ends_conversation`, `category` |
 | `conversation.offtopic` | `ConversationOfftopicEvent` | `message_id` |
 | `conversation.end` | `ConversationEndEvent` | `message_id`, `reason` |
 | `skill_code.cta` | `SkillCodeCtaEvent` | `skill_code`, `widget`, `text` |
@@ -219,6 +223,11 @@ propagates unchanged.
 
 - **Unknown events never raise.** New event names arrive as `UnknownChatStreamEvent`; ignore the ones you
   don't use yet.
+- **Guardian IDs and categories are open.** `guardian_id` and `category` arrive as the strings the
+  API sent. Compare them with the `PartnerGuardianId` and `GuardianCategory` members you handle,
+  and treat any other value as new rather than ignoring the event. A `guardian` event that omits
+  `endsConversation` or `category`, or sends `null`, still arrives as a `GuardianEvent`, with
+  `ends_conversation=False` and `category="other"`.
 - **An `error` event is yielded, not raised.** Handle it apart from message text.
 - **Errors before the stream starts raise:** `ConflictError` for
   `error.partner.chat_stream_in_progress`, `ServiceUnavailableError` for
@@ -415,7 +424,8 @@ async def doctronic_webhook(request: Request) -> Response:
 
 Events: `AppointmentWaitingRoomReadyEvent`, `AppointmentPractitionerJoinedEvent`,
 `AppointmentCallEndedEvent`, `ArtifactReadyEvent`, and `UnknownWebhookEvent` for event names this
-version doesn't know.
+version doesn't know. The four known ones are generated from the contract's `webhooks`, and
+`doctronic.types` also exports them under their contract names, such as `ArtifactReadyPayload`.
 
 ## Versioning
 

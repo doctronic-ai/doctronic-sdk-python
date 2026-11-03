@@ -11,13 +11,24 @@ import hashlib
 import hmac
 import json
 from datetime import datetime
-from typing import Any, Literal, TypeAlias, cast
+from typing import Any, TypeAlias
 
 import pydantic
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from ._errors import WebhookVerificationError
+from ._generated.events import WEBHOOK_EVENTS, KnownWebhookEvent
+from ._generated.models import (
+    AppointmentCallEndedData,
+    AppointmentCallEndedPayload,
+    AppointmentPractitionerJoinedData,
+    AppointmentPractitionerJoinedPayload,
+    AppointmentWaitingRoomReadyData,
+    AppointmentWaitingRoomReadyPayload,
+    ArtifactReadyData,
+    ArtifactReadyPayload,
+)
 
 __all__ = [
     "SIGNATURE_HEADER",
@@ -46,29 +57,6 @@ class _WebhookModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="allow")
 
 
-class AppointmentWaitingRoomReadyData(_WebhookModel):
-    appointment_id: str
-    user_id: str
-    waiting_room_url: str
-
-
-class AppointmentPractitionerJoinedData(_WebhookModel):
-    appointment_id: str
-    user_id: str
-
-
-class AppointmentCallEndedData(_WebhookModel):
-    appointment_id: str
-    user_id: str
-
-
-class ArtifactReadyData(_WebhookModel):
-    artifact_id: str
-    artifact_type: str
-    chat_id: str
-    user_id: str | None
-
-
 class _Envelope(_WebhookModel):
     event_id: str
     """Stable across every delivery attempt of one event. Deduplicate on it."""
@@ -76,32 +64,12 @@ class _Envelope(_WebhookModel):
     """When the event happened, not when this attempt arrived."""
 
 
-class AppointmentWaitingRoomReadyEvent(_Envelope):
-    """A join URL is ready. Replace any URL you stored earlier."""
-
-    event: Literal["appointment.waiting_room_ready"]
-    data: AppointmentWaitingRoomReadyData
-
-
-class AppointmentPractitionerJoinedEvent(_Envelope):
-    """A practitioner joined the appointment."""
-
-    event: Literal["appointment.practitioner_joined"]
-    data: AppointmentPractitionerJoinedData
-
-
-class AppointmentCallEndedEvent(_Envelope):
-    """The appointment call ended."""
-
-    event: Literal["appointment.call_ended"]
-    data: AppointmentCallEndedData
-
-
-class ArtifactReadyEvent(_Envelope):
-    """A consultation document is ready to retrieve."""
-
-    event: Literal["artifact.ready"]
-    data: ArtifactReadyData
+# The payloads are generated from the contract's `webhooks`. These are the names the SDK has used
+# for them since 0.1.0; `doctronic.types` exports both.
+AppointmentWaitingRoomReadyEvent = AppointmentWaitingRoomReadyPayload
+AppointmentPractitionerJoinedEvent = AppointmentPractitionerJoinedPayload
+AppointmentCallEndedEvent = AppointmentCallEndedPayload
+ArtifactReadyEvent = ArtifactReadyPayload
 
 
 class UnknownWebhookEvent(_Envelope):
@@ -111,23 +79,8 @@ class UnknownWebhookEvent(_Envelope):
     data: Any = None
 
 
-KnownWebhookEvent: TypeAlias = (
-    AppointmentWaitingRoomReadyEvent
-    | AppointmentPractitionerJoinedEvent
-    | AppointmentCallEndedEvent
-    | ArtifactReadyEvent
-)
-"""Every webhook event the docs list."""
-
 WebhookEvent: TypeAlias = KnownWebhookEvent | UnknownWebhookEvent
 """A verified webhook delivery. Narrow it with `isinstance`."""
-
-_EVENT_TYPES: dict[str, type[_Envelope]] = {
-    "appointment.waiting_room_ready": AppointmentWaitingRoomReadyEvent,
-    "appointment.practitioner_joined": AppointmentPractitionerJoinedEvent,
-    "appointment.call_ended": AppointmentCallEndedEvent,
-    "artifact.ready": ArtifactReadyEvent,
-}
 
 
 def verify_webhook(
@@ -159,9 +112,10 @@ def verify_webhook(
     if not isinstance(payload, dict):
         raise WebhookVerificationError("The signed webhook body isn't an event envelope.")
     name = payload.get("event")
-    model = (_EVENT_TYPES.get(name) if isinstance(name, str) else None) or UnknownWebhookEvent
+    known = WEBHOOK_EVENTS.get(name) if isinstance(name, str) else None
+    model: type[KnownWebhookEvent | UnknownWebhookEvent] = known or UnknownWebhookEvent
     try:
-        return cast("WebhookEvent", model.model_validate(payload))
+        return model.model_validate(payload)
     except pydantic.ValidationError as exc:
         raise WebhookVerificationError(
             f"The signed webhook body isn't a valid event envelope: {exc}"

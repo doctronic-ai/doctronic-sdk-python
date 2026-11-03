@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 
@@ -14,11 +14,18 @@ from doctronic import (
     WebhookVerificationError,
     verify_webhook,
 )
+from doctronic._generated.events import WEBHOOK_EVENTS
 from doctronic.types import (
     AppointmentCallEndedEvent,
+    AppointmentCallEndedPayload,
     AppointmentPractitionerJoinedEvent,
+    AppointmentPractitionerJoinedPayload,
     AppointmentWaitingRoomReadyEvent,
+    AppointmentWaitingRoomReadyPayload,
     ArtifactReadyEvent,
+    ArtifactReadyPayload,
+    ArtifactType,
+    KnownWebhookEvent,
     UnknownWebhookEvent,
 )
 
@@ -168,3 +175,95 @@ def test_empty_secret_is_rejected_as_a_verification_failure() -> None:
     body = delivery("appointment.call_ended", {"appointmentId": "dc_01", "userId": "mem_01"})
     with pytest.raises(WebhookVerificationError, match="secret"):
         verify_webhook(body, sign(body, ""), "")
+
+
+# The payloads generated from the contract's `webhooks`.
+
+DATA: dict[str, dict[str, Any]] = {
+    "appointment.waiting_room_ready": {
+        "appointmentId": "dc_01",
+        "userId": "mem_01",
+        "waitingRoomUrl": "https://example.com/w",
+    },
+    "appointment.practitioner_joined": {"appointmentId": "dc_01", "userId": "mem_01"},
+    "appointment.call_ended": {"appointmentId": "dc_01", "userId": "mem_01"},
+    "artifact.ready": {
+        "artifactId": "art_01",
+        "artifactType": "soap_note",
+        "chatId": "chat_01",
+        "userId": "mem_01",
+    },
+}
+
+
+def test_the_event_classes_are_the_generated_payloads() -> None:
+    assert {
+        "appointment.waiting_room_ready": AppointmentWaitingRoomReadyEvent,
+        "appointment.practitioner_joined": AppointmentPractitionerJoinedEvent,
+        "appointment.call_ended": AppointmentCallEndedEvent,
+        "artifact.ready": ArtifactReadyEvent,
+    } == WEBHOOK_EVENTS
+    assert (
+        AppointmentWaitingRoomReadyEvent,
+        AppointmentPractitionerJoinedEvent,
+        AppointmentCallEndedEvent,
+        ArtifactReadyEvent,
+    ) == (
+        AppointmentWaitingRoomReadyPayload,
+        AppointmentPractitionerJoinedPayload,
+        AppointmentCallEndedPayload,
+        ArtifactReadyPayload,
+    )
+    assert set(get_args(KnownWebhookEvent)) == set(WEBHOOK_EVENTS.values())
+
+
+@pytest.mark.parametrize("name", list(DATA))
+def test_every_webhook_parses_into_its_payload_and_round_trips(name: str) -> None:
+    body = delivery(name, DATA[name])
+
+    event = verify_webhook(body, sign(body), SECRET)
+
+    assert type(event) is WEBHOOK_EVENTS[name]
+    assert event.model_dump(mode="json", by_alias=True) == json.loads(body)
+
+
+def test_artifact_type_is_an_open_enum() -> None:
+    known = delivery("artifact.ready", DATA["artifact.ready"])
+    new = delivery("artifact.ready", {**DATA["artifact.ready"], "artifactType": "discharge_note"})
+
+    known_event = verify_webhook(known, sign(known), SECRET)
+    new_event = verify_webhook(new, sign(new), SECRET)
+
+    assert isinstance(known_event, ArtifactReadyEvent)
+    assert known_event.data.artifact_type is ArtifactType.soap_note
+    assert isinstance(new_event, ArtifactReadyEvent)
+    assert isinstance(new_event.data.artifact_type, ArtifactType)
+    assert new_event.data.artifact_type == "discharge_note"
+
+
+def test_payloads_keep_fields_the_contract_doesnt_list() -> None:
+    body = delivery("appointment.call_ended", {**DATA["appointment.call_ended"], "reason": "done"})
+
+    event = verify_webhook(body, sign(body), SECRET)
+
+    assert isinstance(event, AppointmentCallEndedEvent)
+    assert event.data.model_dump(by_alias=True)["reason"] == "done"
+
+
+@pytest.mark.parametrize("name", [*DATA, "appointment.rescheduled"])
+def test_occurred_at_is_required(name: str) -> None:
+    body = json.dumps({"eventId": EVENT_ID, "event": name, "data": DATA.get(name, {})}).encode()
+
+    with pytest.raises(WebhookVerificationError, match="envelope"):
+        verify_webhook(body, sign(body), SECRET)
+
+
+@pytest.mark.parametrize("url", ["", "https://example.com/" + "w" * 2084])
+def test_waiting_room_url_outside_the_contract_length_fails(url: str) -> None:
+    body = delivery(
+        "appointment.waiting_room_ready",
+        {**DATA["appointment.waiting_room_ready"], "waitingRoomUrl": url},
+    )
+
+    with pytest.raises(WebhookVerificationError, match="envelope"):
+        verify_webhook(body, sign(body), SECRET)
